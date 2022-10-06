@@ -1,0 +1,144 @@
+import os
+import cv2
+import numpy as np
+import apriltag
+import collections
+
+
+def draw_pose(overlay, camera_params, tag_size, pose, z_sign=1):
+
+    opoints = np.array([
+        -1, -1, 0,
+         1, -1, 0,
+         1,  1, 0,
+        -1,  1, 0,
+        -1, -1, -2*z_sign,
+         1, -1, -2*z_sign,
+         1,  1, -2*z_sign,
+        -1,  1, -2*z_sign,
+    ]).reshape(-1, 1, 3) * 0.5*tag_size
+
+    edges = np.array([
+        0, 1,
+        1, 2,
+        2, 3,
+        3, 0,
+        0, 4,
+        1, 5,
+        2, 6,
+        3, 7,
+        4, 5,
+        5, 6,
+        6, 7,
+        7, 4
+    ]).reshape(-1, 2)
+
+    fx, fy, cx, cy = camera_params
+
+    K = np.array([fx, 0, cx, 0, fy, cy, 0, 0, 1]).reshape(3, 3)
+
+    rvec, _ = cv2.Rodrigues(pose[:3,:3])
+    tvec = pose[:3, 3]
+
+    dcoeffs = np.zeros(5)
+
+    ipoints, _ = cv2.projectPoints(opoints, rvec, tvec, K, dcoeffs)
+
+    ipoints = np.round(ipoints).astype(int)
+
+    ipoints = [tuple(pt) for pt in ipoints.reshape(-1, 2)]
+
+    for i, j in edges:
+        cv2.line(overlay, ipoints[i], ipoints[j], (0, 255, 0), 1, 16)
+
+
+def draw_pose_axes(overlay, camera_params, tag_size, pose, center):
+
+    fx, fy, cx, cy = camera_params
+    K = np.array([fx, 0, cx, 0, fy, cy, 0, 0, 1]).reshape(3, 3)
+
+    rvec, _ = cv2.Rodrigues(pose[:3,:3])
+    tvec = pose[:3, 3]
+
+    dcoeffs = np.zeros(5)
+
+    opoints = np.float32([[1,0,0],
+                             [0,-1,0],
+                             [0,0,-1]]).reshape(-1,3) * tag_size
+
+    ipoints, _ = cv2.projectPoints(opoints, rvec, tvec, K, dcoeffs)
+    ipoints = np.round(ipoints).astype(int)
+
+    center = np.round(center).astype(int)
+    center = tuple(center.ravel())
+
+    cv2.line(overlay, center, tuple(ipoints[0].ravel()), (0,0,255), 2)
+    cv2.line(overlay, center, tuple(ipoints[1].ravel()), (0,255,0), 2)
+    cv2.line(overlay, center, tuple(ipoints[2].ravel()), (255,0,0), 2)
+
+
+def annotate_detection(overlay, detection, center):
+
+    text = str(detection.tag_id)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    tag_size_px = np.sqrt((detection.corners[1][0]-detection.corners[0][0])**2+\
+                             (detection.corners[1][1]-detection.corners[0][1])**2)
+    font_size = tag_size_px/22
+    text_size = cv2.getTextSize(text, font, font_size, 2)[0]
+    tag_center = [detection.center[0], detection.center[1]]
+    text_x = int(tag_center[0] - text_size[0]/2)
+    text_y = int(tag_center[1] + text_size[1]/2)
+    cv2.putText(overlay, text, (text_x, text_y), font, font_size, (0, 255, 255), 2)
+
+
+def detect_april_tag(orig, camera_params, tag_size, visualize=False, save_path=None, verbose=False):
+    if len(orig.shape) == 3:
+        gray = cv2.cvtColor(orig, cv2.COLOR_RGB2GRAY)
+
+    detector = apriltag.Detector()
+    detections, dimg = detector.detect(gray, return_image=True)
+
+    if len(orig.shape) == 3:
+        overlay = orig // 2 + dimg[:, :, None] // 2
+    else:
+        overlay = orig // 2 + dimg // 2
+
+    num_detections = len(detections)
+    if verbose:
+        print('Detected {} tags in {}\n'.format(num_detections, os.path.split(imagepath)[1]))
+
+    poses = []
+    for i, detection in enumerate(detections):
+        if verbose:
+            print()
+            print( 'Detection {} of {}:'.format(i+1, num_detections))
+            print(detection.tostring(indent=2))
+
+        if camera_params is not None:
+            pose, e0, e1 = detector.detection_pose(detection, camera_params, tag_size)
+            poses.append((detection.tag_id, pose))
+            draw_pose(overlay, camera_params, tag_size, pose)
+            draw_pose_axes(overlay, camera_params, tag_size, pose, detection.center)
+            annotate_detection(overlay, detection, tag_size)
+
+            if verbose:
+                print(detection.tostring(collections.OrderedDict([('Pose',pose),
+                    ('InitError', e0), ('FinalError', e1)]), indent=2))
+
+    if visualize:
+        cv2.imshow('apriltag', overlay)
+        while cv2.waitKey(5) < 0:   # Press any key to load subsequent image
+            continue
+        cv2.destroyAllWindows()
+
+    if save_path is not None:
+        cv2.imwrite(output_path, overlay)
+
+    return poses, overlay
+
+
+if __name__ == '__main__':
+    imagepath = '/home/gdk/Documents/data/1652826411/827312071624/000000_color.png'
+    camera_params = (765.00, 764.18, 393.72, 304.66)
+    tag_size = 0.06
+    detect_april_tag(imagepath, camera_params, tag_size, visualize=True, save_path=None, verbose=True)
