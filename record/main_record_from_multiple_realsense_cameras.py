@@ -5,6 +5,7 @@ import time
 import cv2
 import numpy as np
 import pyrealsense2 as rs
+import yaml
 
 from record.realsense_device_manager import DeviceManager
 
@@ -71,9 +72,13 @@ try:
         print(fx, fy, px, py)
 
         camera_path = dict_cameras_k_path[k]
-        with open(f'{camera_path}/intrinsics.json', 'w') as file:
-            intrinsics = [fx, 0.0, px, 0.0, fy, py, 0.0, 0.0, 1.0]
-            json.dump(intrinsics, file)
+        with open(f'{camera_path}/camera_meta.yml', 'w') as file:
+            assert True
+            save_str = {'INTRINSICS': [fx, 0.0, px, 0.0, fy, py, 0.0, 0.0, 1.0],
+                        'DEPTH_UNIT': 'mm',
+                        'FRAME_WIDTH': resolution_width,
+                        'FRAME_HEIGHT': resolution_height}
+            yaml.dump(save_str, file)
 
     # save frames
     i = 0

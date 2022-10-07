@@ -9,20 +9,20 @@ import numpy as np
 import yaml
 
 
-def find_camera_seq(demo_root):
-    folders = os.listdir(demo_root)
+def get_camera_names(scene_path):
+    folders = os.listdir(scene_path)
     camera_seq = []
     for f in folders:
-        if f[:5].isnumeric():
+        if f[:7] == 'camera_':
             camera_seq.append(f)
     return camera_seq
 
 
-def frame_number(demo_root):
-    camera_seq = find_camera_seq(demo_root)
+def frame_number(scene_path):
+    camera_seq = get_camera_names(scene_path)
     nums = []
     for camera in camera_seq:
-        files = glob.glob(f'{demo_root}/{camera}/*depth.png')
+        files = glob.glob(f'{scene_path}/{camera}/*depth.png')
         nums.append(len(files))
     return min(nums)
 
@@ -77,21 +77,29 @@ def load_images(imgs_path, uniqname, mode=cv2.IMREAD_COLOR):
     return imgs
 
 
-def load_npys(demo_root, camera, img_type, verbose=False):
+def load_npys(scene_path, camera, img_type, verbose=False):
     npys = []
-    num_frame = frame_number(demo_root)
+    num_frame = frame_number(scene_path)
     for frame in range(num_frame):
-        path = f'{demo_root}/{camera}/{frame:06d}_{img_type}.npy'
+        path = f'{scene_path}/{camera}/{frame:06d}_{img_type}.npy'
         if verbose:
             print(path)
         npys.append(np.load(path))
     return npys
 
 
-def load_intrinsics(intrinsics_path):
-    with open(intrinsics_path, "r") as stream:
+def load_intrinsics(camera_meta_path):
+    with open(camera_meta_path, "r") as stream:
         intrinsics = np.array(yaml.safe_load(stream)['INTRINSICS']).reshape(3, 3)
     return intrinsics
+
+
+def get_depth_scale(camera_meta_path, convert2unit='mm'):
+    with open(camera_meta_path, "r") as stream:
+        depth_unit = yaml.safe_load(stream)['DEPTH_UNIT']
+    dict_unit_scale = {'m': 1000.0, 'mm': 1.0, 'μm': 0.1}
+    depth_scale = dict_unit_scale[convert2unit] / dict_unit_scale[depth_unit]
+    return depth_scale
 
 
 def load_ground_truth(gt_path):
@@ -132,11 +140,11 @@ def load_bop_est_pose(bop_results_path, scene_id, image_id):
 
 
 if __name__ == '__main__':
-    # demo_root = '/home/gdk/Documents/data/1652826411'
-    # camera_seq = find_camera_seq(demo_root)
-    # print(camera_seq)
-    # frame_number = frame_number(demo_root)
+    scene_path = '/home/gdk/data/1654267227_formated'
+    camera_seq = get_camera_names(scene_path)
+    print(camera_seq)
+    # frame_number = frame_number(scene_path)
     # print(frame_number)
 
-    imgs_paths = '/home/gdk/data/1660754262/827312071794/foreground/_posecnn_results'
-    imgs_to_video(imgs_paths, imgs_paths, '.png_render.jpg')
+    # imgs_paths = '/home/gdk/data/1660754262/827312071794/foreground/_posecnn_results'
+    # imgs_to_video(imgs_paths, imgs_paths, '.png_render.jpg')
