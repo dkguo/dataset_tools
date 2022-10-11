@@ -94,19 +94,33 @@ def load_intrinsics(camera_meta_path):
     return intrinsics
 
 
+def load_extrinsics(extrinsics_path):
+    with open(extrinsics_path, 'r') as file:
+        y = yaml.full_load(file)
+
+    ext = y['extrinsics']
+    for k, e in ext.items():
+        ext[k] = np.array(e)
+
+    return ext
+
+
 def get_depth_scale(camera_meta_path, convert2unit='mm'):
     with open(camera_meta_path, "r") as stream:
         depth_unit = yaml.safe_load(stream)['DEPTH_UNIT']
     dict_unit_scale = {'m': 1000.0, 'mm': 1.0, 'μm': 0.1}
-    depth_scale = dict_unit_scale[convert2unit] / dict_unit_scale[depth_unit]
+    depth_scale = dict_unit_scale[depth_unit] / dict_unit_scale[convert2unit]
     return depth_scale
 
 
 def load_ground_truth(gt_path):
+    """
+    :return: dict_imid_objid_poses
+    """
     with open(gt_path) as f:
         im_gts = json.load(f)
 
-    gt_dict_iim_iobj_poses = {}
+    gt_dict_imid_objid_poses = {}
     for im_id, gts in im_gts.items():
         gt_dict_id_poses = {}
         for gt in gts:
@@ -118,8 +132,8 @@ def load_ground_truth(gt_path):
             if obj_id not in gt_dict_id_poses:
                 gt_dict_id_poses[obj_id] = []
             gt_dict_id_poses[obj_id].append(p_gt)
-        gt_dict_iim_iobj_poses[int(im_id)] = gt_dict_id_poses
-    return gt_dict_iim_iobj_poses
+        gt_dict_imid_objid_poses[int(im_id)] = gt_dict_id_poses
+    return gt_dict_imid_objid_poses
 
 
 def load_bop_est_pose(bop_results_path, scene_id, image_id):
@@ -143,8 +157,13 @@ if __name__ == '__main__':
     scene_path = '/home/gdk/data/1654267227_formated'
     camera_seq = get_camera_names(scene_path)
     print(camera_seq)
+
     # frame_number = frame_number(scene_path)
     # print(frame_number)
 
     # imgs_paths = '/home/gdk/data/1660754262/827312071794/foreground/_posecnn_results'
     # imgs_to_video(imgs_paths, imgs_paths, '.png_render.jpg')
+
+    # test load extrinsics
+    # ext_path = '/home/gdk/data/scene_220603104027/extrinsics.yml'
+    # load_extrinsics(ext_path)

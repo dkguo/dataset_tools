@@ -1,7 +1,5 @@
-# Author: Anas Gouda (anas.gouda@tu-dortmund.de)
-# FLW, TU Dortmund, Germany
-
-"""Manual annotation tool for datasets with BOP format
+"""
+Manual annotation tool with multiple views
 
 Using RGB, Depth and Models the tool will generate the "scene_gt.json" annotation file
 
@@ -11,12 +9,6 @@ original repo: https://github.com/FLW-TUDO/3d_annotation_tool
 
 """
 
-# import os
-# os.environ['PYOPENGL_PLATFORM'] = 'egl'
-
-import glob
-
-import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
 import open3d.visualization.gui as gui
@@ -26,44 +18,16 @@ import json
 import cv2
 import warnings
 
-from config import model_names
-from modules.helpers.render import create_scene, render_obj_pose, overlay_imgs, load_meshes
-
-# PARAMETERS.
-################################################################################
-p = {
-    # Folder containing the BOP datasets.
-    'dataset_path': '/home/gdk/data/bop_format',
-
-    # Dataset split. Options: 'train', 'test'.
-    'dataset_split': 'val',
-
-    # Dataset split type. Options: 'synt', 'real', None = default. See dataset_params.py for options.
-    'dataset_split_type': None,
-
-    # scene number to open tool on
-    'start_scene_num': 0,
-
-    # image number inside scene to open tool on
-    'start_image_num': 76
-
-}
-################################################################################
+from loaders import load_intrinsics, get_depth_scale, get_camera_names, load_extrinsics
+from renderer import load_meshes, create_scene, model_names, render_obj_pose, overlay_imgs, ply_model_paths
 
 dist = 0.002
 deg = 1
 
 
-class Dataset:
-    def __init__(self, dataset_path, dataset_split):
-        self.scenes_path = os.path.join(dataset_path, dataset_split)
-        self.objects_path = os.path.join(dataset_path, 'models')
-
-
 class AnnotationScene:
-    def __init__(self, scene_point_cloud, scene_num, image_num):
+    def __init__(self, scene_point_cloud, image_num):
         self.annotation_scene = scene_point_cloud
-        self.scene_num = scene_num
         self.image_num = image_num
 
         self.obj_list = list()
@@ -121,11 +85,11 @@ class AppWindow:
             self.settings.bg_color.red, self.settings.bg_color.green,
             self.settings.bg_color.blue, self.settings.bg_color.alpha
         ]
-        self._scene.scene.set_background(bg_color)
-        self._scene.scene.show_axes(self.settings.show_axes)
+        self.pc_scene_widget.scene.set_background(bg_color)
+        self.pc_scene_widget.scene.show_axes(self.settings.show_axes)
 
         if self.settings.apply_material:
-            self._scene.scene.modify_geometry_material("annotation_scene", self.settings.scene_material)
+            self.pc_scene_widget.scene.modify_geometry_material("annotation_scene", self.settings.scene_material)
             self.settings.apply_material = False
 
         self._show_axes.checked = self.settings.show_axes
@@ -133,9 +97,7 @@ class AppWindow:
         self._point_size.double_value = self.settings.scene_material.point_size
 
     def _on_layout(self, layout_context):
-        # return
         r = self.window.content_rect
-        # self._scene.frame = r
         width = 17 * layout_context.theme.font_size
         height = min(
             r.height,
@@ -144,19 +106,25 @@ class AppWindow:
         self._settings_panel.frame = gui.Rect(r.get_right() - width, r.y, width, height)
         self.im_scene_widget.frame = gui.Rect(0, r.y, r.get_right() - width, height)
 
-    def __init__(self, width, height, scenes):
-        self.pre_load_meshes = load_meshes([1, 14])
-        self.rgb_img = None
+    def __init__(self, width, height, scene_path):
+        self.active_camera_view = 0
+        self.pre_load_meshes = load_meshes([1, 13])
+        self.camera_names = sorted(get_camera_names(scene_path))
+        self.py_renderers = []
+        for camera in self.camera_names:
+            cam_K = load_intrinsics(f'{scene_path}/{camera}/camera_meta.yml')
+            self.py_renderers.append(create_scene(cam_K, pre_load_meshes=self.pre_load_meshes))
+        self.extrinsics = load_extrinsics(f'{scene_path}/extrinsics.yml')
+        self.rgb_imgs = []
         self.active_objs_pose = {}
-        self.scenes = scenes
+        self.scene_path = scene_path
         self.settings = Settings()
 
         # 3D widget
         self.pt_window = gui.Application.instance.create_window("Point Cloulds", 640, 480)
-        self._scene = gui.SceneWidget()
-        self._scene.scene = rendering.Open3DScene(self.pt_window.renderer)
-        self._scene.enable_scene_caching(False)
-        self.pt_window.add_child(self._scene)
+        self.pc_scene_widget = gui.SceneWidget()
+        self.pc_scene_widget.scene = rendering.Open3DScene(self.pt_window.renderer)
+        self.pt_window.add_child(self.pc_scene_widget)
 
         # Window to display redenered image
         self.window = gui.Application.instance.create_window("BOP manual annotation tool", width, height)
@@ -170,18 +138,13 @@ class AppWindow:
         im = o3d.geometry.Image(im)
         self.im_scene_widget.scene.set_background([0, 0, 0, 0], im)
 
-        # self.im_widget = gui.ImageWidget(im)
-        # self.window.add_child(self.im_widget)
-
         # ---- Settings panel ----
         em = w.theme.font_size
         separation_height = int(round(0.5 * em))
 
-        self._settings_panel = gui.Vert(
-            0, gui.Margins(0.25 * em, 0.25 * em, 0.25 * em, 0.25 * em))
+        self._settings_panel = gui.Vert(0, gui.Margins(0.25 * em, 0.25 * em, 0.25 * em, 0.25 * em))
 
-        view_ctrls = gui.CollapsableVert("View control", 0,
-                                         gui.Margins(em, 0, 0, 0))
+        view_ctrls = gui.CollapsableVert("View control", 0, gui.Margins(em, 0, 0, 0))
         view_ctrls.set_is_open(True)
 
         self._show_axes = gui.Checkbox("Show axes")
@@ -230,7 +193,6 @@ class AppWindow:
         self._scene_control.set_is_open(True)
 
         self._images_buttons_label = gui.Label("Images:")
-        self._samples_buttons_label = gui.Label("Scene: ")
 
         self._pre_image_button = gui.Button("Previous")
         self._pre_image_button.horizontal_padding_em = 0.8
@@ -240,14 +202,7 @@ class AppWindow:
         self._next_image_button.horizontal_padding_em = 0.8
         self._next_image_button.vertical_padding_em = 0
         self._next_image_button.set_on_clicked(self._on_next_image)
-        self._pre_sample_button = gui.Button("Previous")
-        self._pre_sample_button.horizontal_padding_em = 0.8
-        self._pre_sample_button.vertical_padding_em = 0
-        self._pre_sample_button.set_on_clicked(self._on_previous_scene)
-        self._next_sample_button = gui.Button("Next")
-        self._next_sample_button.horizontal_padding_em = 0.8
-        self._next_sample_button.vertical_padding_em = 0
-        self._next_sample_button.set_on_clicked(self._on_next_scene)
+
         # 2 rows for sample and scene control
         h = gui.Horiz(0.4 * em)  # row 1
         h.add_stretch()
@@ -258,17 +213,11 @@ class AppWindow:
         self._scene_control.add_child(h)
         h = gui.Horiz(0.4 * em)  # row 2
         h.add_stretch()
-        h.add_child(self._samples_buttons_label)
-        h.add_child(self._pre_sample_button)
-        h.add_child(self._next_sample_button)
-        h.add_stretch()
         self._scene_control.add_child(h)
 
         self._view_numbers = gui.Horiz(0.4 * em)
         self._image_number = gui.Label("Image: " + f'{0:06}')
-        self._scene_number = gui.Label("Scene: " + f'{0:06}')
         self._view_numbers.add_child(self._image_number)
-        self._view_numbers.add_child(self._scene_number)
         self._scene_control.add_child(self._view_numbers)
 
         self._settings_panel.add_child(self._scene_control)
@@ -307,12 +256,11 @@ class AppWindow:
 
         # set callbacks for key control
         self.im_scene_widget.set_on_key(self._transform)
-        self._scene.set_on_key(self._transform)
+        self.pc_scene_widget.set_on_key(self._transform)
 
         self._left_shift_modifier = False
 
-    def _update_scene_numbers(self):
-        self._scene_number.text = "Scene: " + f'{self._annotation_scene.scene_num:06}'
+    def _update_img_numbers(self):
         self._image_number.text = "Image: " + f'{self._annotation_scene.image_num:06}'
 
     def _transform(self, event):
@@ -337,9 +285,23 @@ class AppWindow:
                 deg = 1
             return gui.Widget.EventCallbackResult.HANDLED
 
+        # Change camera view
+        if event.key >= 49 and event.key <= 56:
+            if event.type == gui.KeyEvent.DOWN:
+                view_id = event.key - 49
+                if view_id < len(self.camera_names):
+                    print(f'Change to camera_{view_id+1:02d}')
+                    self.active_camera_view = view_id
+                    self._update_rgb_views()
+                    return gui.Widget.EventCallbackResult.HANDLED
+                else:
+                    return gui.Widget.EventCallbackResult.HANDLED
+            else:
+                return gui.Widget.EventCallbackResult.HANDLED
+
         # if no active_mesh selected print error
         if self._meshes_used.selected_index == -1:
-            self._on_error("No objects are highlighted in scene meshes")
+            self._on_error("No objects are selected in scene meshes")
             return gui.Widget.EventCallbackResult.HANDLED
 
         def move(x, y, z, rx, ry, rz):
@@ -347,22 +309,34 @@ class AppWindow:
 
             objects = self._annotation_scene.get_objects()
             active_obj = objects[self._meshes_used.selected_index]
+
+            T_ci_to_master = np.linalg.inv(self.extrinsics[self.camera_names[self.active_camera_view]])
+            T_master_to_c0 = self.extrinsics[self.camera_names[0]]
+            T_ci_to_c0 = T_ci_to_master @ T_master_to_c0
+
             # translation or rotation
             if x != 0 or y != 0 or z != 0:
-                h_transform = np.array([[1, 0, 0, x], [0, 1, 0, y], [0, 0, 1, z], [0, 0, 0, 1]])
+                ci_h_transform = np.array([[1, 0, 0, x], [0, 1, 0, y], [0, 0, 1, z], [0, 0, 0, 1]])
             else:  # elif rx!=0 or ry!=0 or rz!=0:
-                center = active_obj.obj_geometry.get_center()
-                rot_mat_obj_center = active_obj.obj_geometry.get_rotation_matrix_from_xyz((rx, ry, rz))
-                T_neg = np.vstack((np.hstack((np.identity(3), -center.reshape(3, 1))), [0, 0, 0, 1]))
+                c0_center = active_obj.obj_geometry.get_center()
+                ci_center = T_ci_to_c0 @ np.append(c0_center, 1)
+                ci_center = ci_center[:3]
+
+                ci_T_neg = np.vstack((np.hstack((np.identity(3), -ci_center.reshape(3, 1))), [0, 0, 0, 1]))
+                ci_T_pos = np.vstack((np.hstack((np.identity(3), ci_center.reshape(3, 1))), [0, 0, 0, 1]))
+
+                rot_mat_obj_center = o3d.geometry.get_rotation_matrix_from_xyz((rx, ry, rz))
                 R = np.vstack((np.hstack((rot_mat_obj_center, [[0], [0], [0]])), [0, 0, 0, 1]))
-                T_pos = np.vstack((np.hstack((np.identity(3), center.reshape(3, 1))), [0, 0, 0, 1]))
-                h_transform = np.matmul(T_pos, np.matmul(R, T_neg))
+                ci_h_transform = np.matmul(ci_T_pos, np.matmul(R, ci_T_neg))
+
+            h_transform = np.linalg.inv(T_ci_to_c0) @ ci_h_transform @ T_ci_to_c0
+
             active_obj.obj_geometry.transform(h_transform)
-            center = active_obj.obj_geometry.get_center()
-            self._scene.scene.remove_geometry(active_obj.obj_name)
-            self._scene.scene.add_geometry(active_obj.obj_name, active_obj.obj_geometry,
-                                           self.settings.annotation_obj_material,
-                                           add_downsampled_copy_for_fast_rendering=True)
+            # center = active_obj.obj_geometry.get_center()
+            self.pc_scene_widget.scene.remove_geometry(active_obj.obj_name)
+            self.pc_scene_widget.scene.add_geometry(active_obj.obj_name, active_obj.obj_geometry,
+                                                    self.settings.annotation_obj_material,
+                                                    add_downsampled_copy_for_fast_rendering=True)
             # update values stored of object
             active_obj.transform = np.matmul(h_transform, active_obj.transform)
             self._update_rgb_views()
@@ -440,41 +414,42 @@ class AppWindow:
 
         active_obj.obj_geometry.transform(reg.transformation)
         # active_obj.obj_geometry.paint_uniform_color([0,1,0])  # Debug
-        self._scene.scene.remove_geometry(active_obj.obj_name)
-        self._scene.scene.add_geometry(active_obj.obj_name, active_obj.obj_geometry,
-                                       self.settings.annotation_obj_material,
-                                       add_downsampled_copy_for_fast_rendering=True)
+        self.pc_scene_widget.scene.remove_geometry(active_obj.obj_name)
+        self.pc_scene_widget.scene.add_geometry(active_obj.obj_name, active_obj.obj_geometry,
+                                                self.settings.annotation_obj_material,
+                                                add_downsampled_copy_for_fast_rendering=True)
         active_obj.transform = np.matmul(reg.transformation, active_obj.transform)
         self._update_rgb_views()
 
     def _on_generate(self):
-        image_num = self._annotation_scene.image_num
-        model_names = self.load_model_names()
+        for camera in self.camera_names:
+            json_6d_path = os.path.join(self.scene_path, camera, "scene_gt.json")
 
-        json_6d_path = os.path.join(self.scenes.scenes_path, f"{self._annotation_scene.scene_num:06}", "scene_gt.json")
+            image_num = self._annotation_scene.image_num
 
-        if os.path.exists(json_6d_path):
-            with open(json_6d_path, "r") as gt_scene:
-                gt_6d_pose_data = json.load(gt_scene)
-        else:
-            gt_6d_pose_data = {}
+            if os.path.exists(json_6d_path):
+                with open(json_6d_path, "r") as gt_scene:
+                    gt_6d_pose_data = json.load(gt_scene)
+            else:
+                gt_6d_pose_data = {}
 
-        # wrtie/update "scene_gt.json"
-        with open(json_6d_path, 'w+') as gt_scene:
-            view_angle_data = list()
-            for obj in self._annotation_scene.get_objects():
-                transform_cam_to_object = obj.transform
-                translation = list(transform_cam_to_object[0:3, 3] * 1000)  # convert meter to mm
-                model_names = self.load_model_names()
-                obj_id = model_names.index(obj.obj_name[:-2]) + 1  # assuming max number of object of same object 10
-                obj_data = {
-                    "cam_R_m2c": transform_cam_to_object[0:3, 0:3].tolist(),  # rotation matrix
-                    "cam_t_m2c": translation,  # translation
-                    "obj_id": obj_id
-                }
-                view_angle_data.append(obj_data)
-            gt_6d_pose_data[str(image_num)] = view_angle_data
-            json.dump(gt_6d_pose_data, gt_scene)
+            # wrtie/update "scene_gt.json"
+            with open(json_6d_path, 'w+') as gt_scene:
+                view_angle_data = list()
+                for obj in self._annotation_scene.get_objects():
+                    T_cam_to_master = np.linalg.inv(self.extrinsics[camera])
+                    T_master_to_cam0 = self.extrinsics[self.camera_names[0]]
+                    transform_cam_to_object = T_cam_to_master @ T_master_to_cam0 @ obj.transform
+                    translation = list(transform_cam_to_object[0:3, 3] * 1000)  # convert meter to mm
+                    obj_id = model_names.index(obj.obj_name[:-2]) + 1  # assuming max number of object of same object 10
+                    obj_data = {
+                        "cam_R_m2c": transform_cam_to_object[0:3, 0:3].tolist(),  # rotation matrix
+                        "cam_t_m2c": translation,  # translation
+                        "obj_id": obj_id
+                    }
+                    view_angle_data.append(obj_data)
+                gt_6d_pose_data[str(image_num)] = view_angle_data
+                json.dump(gt_6d_pose_data, gt_scene)
 
         self._annotation_changed = False
 
@@ -513,7 +488,7 @@ class AppWindow:
         # update current object visualization
         meshes = self._annotation_scene.get_objects()
         for mesh in meshes:
-            self._scene.scene.modify_geometry_material(mesh.obj_name, self.settings.annotation_obj_material)
+            self.pc_scene_widget.scene.modify_geometry_material(mesh.obj_name, self.settings.annotation_obj_material)
 
     def _on_point_size(self, size):
         self.settings.scene_material.point_size = int(size)
@@ -575,8 +550,7 @@ class AppWindow:
             print('no obj selected')
             return
 
-        object_geometry = o3d.io.read_point_cloud(
-            self.scenes.objects_path + '/obj_' + f'{self._meshes_available.selected_index + 1:06}' + '.ply')
+        object_geometry = o3d.io.read_point_cloud(ply_model_paths[self._meshes_available.selected_index + 1])
         object_geometry.points = o3d.utility.Vector3dVector(
             np.array(object_geometry.points) / 1000)  # convert mm to meter
         init_trans = np.identity(4)
@@ -586,8 +560,8 @@ class AppWindow:
         object_geometry.transform(init_trans)
         new_mesh_instance = self._obj_instance_count(self._meshes_available.selected_value, meshes)
         new_mesh_name = str(self._meshes_available.selected_value) + '_' + str(new_mesh_instance)
-        self._scene.scene.add_geometry(new_mesh_name, object_geometry, self.settings.annotation_obj_material,
-                                       add_downsampled_copy_for_fast_rendering=True)
+        self.pc_scene_widget.scene.add_geometry(new_mesh_name, object_geometry, self.settings.annotation_obj_material,
+                                                add_downsampled_copy_for_fast_rendering=True)
         self._annotation_scene.add_obj(object_geometry, new_mesh_name, new_mesh_instance, transform=init_trans)
         meshes = self._annotation_scene.get_objects()  # update list after adding current object
         meshes = [i.obj_name for i in meshes]
@@ -601,7 +575,7 @@ class AppWindow:
             return
         meshes = self._annotation_scene.get_objects()
         active_obj = meshes[self._meshes_used.selected_index]
-        self._scene.scene.remove_geometry(active_obj.obj_name)  # remove mesh from scene
+        self.pc_scene_widget.scene.remove_geometry(active_obj.obj_name)  # remove mesh from scene
         self._annotation_scene.remove_obj(self._meshes_used.selected_index)  # remove mesh from class list
         # update list after adding removing object
         meshes = self._annotation_scene.get_objects()  # get new list after deletion
@@ -623,29 +597,25 @@ class AppWindow:
 
         return pcd
 
-    def scene_load(self, scenes_path, scene_num, image_num):
+    def scene_load(self, image_num):
         self._annotation_changed = False
 
-        self._scene.scene.clear_geometry()
+        self.pc_scene_widget.scene.clear_geometry()
         geometry = None
 
-        scene_path = os.path.join(scenes_path, f'{scene_num:06}')
+        cam_K = load_intrinsics(f'{self.scene_path}/camera_01/camera_meta.yml')
+        depth_scale = get_depth_scale(f'{self.scene_path}/camera_01/camera_meta.yml', convert2unit='m')
 
-        camera_params_path = os.path.join(scene_path, 'scene_camera.json')
-        with open(camera_params_path) as f:
-            data = json.load(f)
-            cam_K = data[str(image_num)]['cam_K']
-            cam_K = np.array(cam_K).reshape((3, 3))
-            depth_scale = data[str(image_num)]['depth_scale']
-
-        rgb_path = os.path.join(scene_path, 'rgb', f'{image_num:06}' + '.png')
+        rgb_path = os.path.join(self.scene_path, 'camera_01', 'rgb', f'{image_num:06}' + '.png')
         rgb_img = cv2.imread(rgb_path)
-        self.rgb_img = rgb_img
-        depth_path = os.path.join(scene_path, 'depth', f'{image_num:06}' + '.png')
+        depth_path = os.path.join(self.scene_path, 'camera_01', 'depth', f'{image_num:06}' + '.png')
         depth_img = cv2.imread(depth_path, -1)
-        depth_img = np.float32(depth_img * depth_scale / 1000)
+        depth_img = np.float32(depth_img * depth_scale)
 
-        self.py_renderer = create_scene(cam_K, pre_load_meshes=self.pre_load_meshes)
+        self.rgb_imgs = []
+        for camera in self.camera_names:
+            rgb_path = os.path.join(self.scene_path, camera, 'rgb', f'{image_num:06}' + '.png')
+            self.rgb_imgs.append(cv2.imread(rgb_path))
 
         try:
             geometry = self._make_point_cloud(rgb_img, depth_img, cam_K)
@@ -653,7 +623,7 @@ class AppWindow:
             print("Failed to load scene.")
 
         if geometry is not None:
-            print("[Info] Successfully read scene ", scene_num)
+            print("[Info] Successfully read scene ", image_num)
             if not geometry.has_normals():
                 geometry.estimate_normals()
             geometry.normalize_normals()
@@ -661,33 +631,27 @@ class AppWindow:
             print("[WARNING] Failed to read points")
 
         try:
-            self._scene.scene.add_geometry("annotation_scene", geometry, self.settings.scene_material,
-                                           add_downsampled_copy_for_fast_rendering=True)
+            self.pc_scene_widget.scene.add_geometry("annotation_scene", geometry, self.settings.scene_material,
+                                                    add_downsampled_copy_for_fast_rendering=True)
             bounds = geometry.get_axis_aligned_bounding_box()
-            self._scene.setup_camera(60, bounds, bounds.get_center())
+            self.pc_scene_widget.setup_camera(60, bounds, bounds.get_center())
             center = np.array([0, 0, 0])
             eye = center + np.array([0, 0, -0.5])
             up = np.array([0, -1, 0])
-            self._scene.look_at(center, eye, up)
+            self.pc_scene_widget.look_at(center, eye, up)
 
-            self._annotation_scene = AnnotationScene(geometry, scene_num, image_num)
+            self._annotation_scene = AnnotationScene(geometry, image_num)
             self._meshes_used.set_items([])  # clear list from last loaded scene
 
             # load values if an annotation already exists
-
-            model_names = self.load_model_names()
-
-            scene_gt_path = os.path.join(self.scenes.scenes_path, f"{self._annotation_scene.scene_num:06}",
-                                         'scene_gt.json')
-            # if os.path.exists(json_path):
+            scene_gt_path = os.path.join(self.scene_path, 'camera_01', 'scene_gt.json')
             with open(scene_gt_path) as scene_gt_file:
                 data = json.load(scene_gt_file)
                 scene_data = data[str(image_num)]
                 active_meshes = list()
                 for obj in scene_data:
                     # add object to annotation_scene object
-                    obj_geometry = o3d.io.read_point_cloud(
-                        os.path.join(self.scenes.objects_path, 'obj_' + f"{int(obj['obj_id']):06}" + '.ply'))
+                    obj_geometry = o3d.io.read_point_cloud(ply_model_paths[int(obj['obj_id'])])
                     obj_geometry.points = o3d.utility.Vector3dVector(
                         np.array(obj_geometry.points) / 1000)  # convert mm to meter
                     model_name = model_names[int(obj['obj_id']) - 1]
@@ -704,8 +668,8 @@ class AppWindow:
                     obj_geometry.translate(transform_cam_to_obj[0:3, 3])
                     center = obj_geometry.get_center()
                     obj_geometry.rotate(transform_cam_to_obj[0:3, 0:3], center=center)
-                    self._scene.scene.add_geometry(obj_name, obj_geometry, self.settings.annotation_obj_material,
-                                                   add_downsampled_copy_for_fast_rendering=True)
+                    self.pc_scene_widget.scene.add_geometry(obj_name, obj_geometry, self.settings.annotation_obj_material,
+                                                            add_downsampled_copy_for_fast_rendering=True)
                     active_meshes.append(obj_name)
                     self.active_objs_pose[obj_name] = (int(obj['obj_id']), transform_cam_to_obj)
             self._meshes_used.set_items(active_meshes)
@@ -714,44 +678,53 @@ class AppWindow:
             print(e)
 
         self._update_rgb_views()
-        self._update_scene_numbers()
+        self._update_img_numbers()
 
     def _update_rgb_views(self):
         print('update rgb views')
-        dict_id_poses = {}
+        master_tag_dict_id_poses = {}
         objs = self._annotation_scene.get_objects()
         for obj in objs:
             obj_id = model_names.index(obj.obj_name[:-2]) + 1
             pose = obj.transform
-            if obj_id in dict_id_poses:
-                dict_id_poses[obj_id].append(pose)
+            # convert pose to master_tag
+            pose = self.extrinsics[self.camera_names[0]] @ pose
+            if obj_id in master_tag_dict_id_poses:
+                master_tag_dict_id_poses[obj_id].append(pose)
             else:
-                dict_id_poses[obj_id] = [pose]
+                master_tag_dict_id_poses[obj_id] = [pose]
 
-        py_rendered_im = render_obj_pose(self.py_renderer, dict_id_poses)
-        py_rendered_im = overlay_imgs(self.rgb_img, py_rendered_im)
-        rgb_img_geo = o3d.geometry.Image(cv2.cvtColor(py_rendered_im, cv2.COLOR_BGR2RGB))
+        ren_imgs = []
+        for i, camera in enumerate(self.camera_names):
+            # change pose to corresponding camera view
+            dict_id_poses = {}
+            for obj_id, pose in master_tag_dict_id_poses.items():
+                dict_id_poses[obj_id] = np.linalg.inv(self.extrinsics[camera]) @ pose
+
+            py_rendered_im = render_obj_pose(self.py_renderers[i], dict_id_poses)
+            im = overlay_imgs(self.rgb_imgs[i], py_rendered_im, 1, 0.8)
+            im = cv2.putText(im, camera, (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0),thickness=2)
+            if i == self.active_camera_view:
+                green = np.zeros_like(im)
+                green[:, :, 1] = 255
+                green[10:-10, 10:-10, :] = im[10:-10, 10:-10, :]
+                im = green
+
+            ren_imgs.append(im)
+
+        for i in range(len(ren_imgs), 9):
+            ren_imgs.append(np.zeros_like(ren_imgs[0]))
+
+        h_ims = []
+        for i in range(3):
+            h_ims.append(np.concatenate([ren_imgs[3*i], ren_imgs[3*i+1], ren_imgs[3*i+2]], axis=1))
+        ren_img = np.concatenate(h_ims, axis=0)
+
+        rgb_img_geo = o3d.geometry.Image(cv2.cvtColor(ren_img, cv2.COLOR_BGR2RGB))
         self.im_scene_widget.scene.set_background([0, 0, 0, 0], rgb_img_geo)
-        # self.im_widget.update_image(rgb_img_geo)
-
 
     def update_obj_list(self):
-        model_names = self.load_model_names()
         self._meshes_available.set_items(model_names)
-
-    def load_model_names(self):
-        # path = self.scenes.objects_path + '/models_names.json'
-        # if os.path.exists(path):
-        #     with open(path) as f:
-        #         data = json.load(f)
-        #         model_names = [data[x]['name'] for x in data]
-        # else:  # model names file doesn't exist
-        #     warnings.warn(
-        #         "models_names.json doesn't exist. Objects will be loaded with their literal id (obj_000001, obj_000002, ...)")
-        #     no_of_models = len([os.path.basename(x)[:-4] for x in glob.glob(self.scenes.objects_path + '/*.ply')])
-        #     model_names = ['obj_' + f'{i + 1:06}' for i in range(no_of_models)]
-
-        return model_names
 
     def _check_changes(self):
         if self._annotation_changed:
@@ -762,39 +735,18 @@ class AppWindow:
         else:
             return False
 
-    def _on_next_scene(self):
-        if self._check_changes():
-            return
-
-        if self._annotation_scene.scene_num + 1 > len(
-                next(os.walk(self.scenes.scenes_path))[1]):  # 1 for how many folder (dataset scenes) inside the path
-            self._on_error("There is no next scene.")
-            return
-        self.scene_load(self.scenes.scenes_path, self._annotation_scene.scene_num + 1,
-                        0)  # open next scene on the first image
-
-    def _on_previous_scene(self):
-        if self._check_changes():
-            return
-
-        if self._annotation_scene.scene_num - 1 < 1:
-            self._on_error("There is no scene number before scene 1.")
-            return
-        self.scene_load(self.scenes.scenes_path, self._annotation_scene.scene_num - 1,
-                        0)  # open next scene on the first image
-
     def _on_next_image(self):
         if self._check_changes():
             return
 
         num = len(
-            next(os.walk(os.path.join(self.scenes.scenes_path, f'{self._annotation_scene.scene_num:06}', 'depth')))[2])
+            next(os.walk(os.path.join(self.scene_path, 'camera_01', 'depth')))[2])
         if self._annotation_scene.image_num + 1 >= len(
-                next(os.walk(os.path.join(self.scenes.scenes_path, f'{self._annotation_scene.scene_num:06}', 'depth')))[
+                next(os.walk(os.path.join(self.scene_path, 'camera_01', 'depth')))[
                     2]):  # 2 for files which here are the how many depth images
             self._on_error("There is no next image.")
             return
-        self.scene_load(self.scenes.scenes_path, self._annotation_scene.scene_num, self._annotation_scene.image_num + 1)
+        self.scene_load(self._annotation_scene.image_num + 1)
 
     def _on_previous_image(self):
         if self._check_changes():
@@ -803,28 +755,18 @@ class AppWindow:
         if self._annotation_scene.image_num - 1 < 0:
             self._on_error("There is no image number before image 0.")
             return
-        self.scene_load(self.scenes.scenes_path, self._annotation_scene.scene_num, self._annotation_scene.image_num - 1)
+        self.scene_load(self._annotation_scene.image_num - 1)
 
 
 def main():
+    scene_path = '/home/gdk/data/scene_220603104027'
+    start_image_num = 20
 
-    if p['dataset_split_type']:
-        split_and_type = p['dataset_split'] + '_' + p['dataset_split_type']
-    else:
-        split_and_type = p['dataset_split']
-
-    scenes = Dataset(p['dataset_path'], split_and_type)
     gui.Application.instance.initialize()
-    w = AppWindow(2048, 1536, scenes)
+    w = AppWindow(2048, 1536, scene_path)
 
-    if os.path.exists(scenes.scenes_path) and os.path.exists(scenes.objects_path):
-        w.scene_load(scenes.scenes_path, p['start_scene_num'], p['start_image_num'])
-        w.update_obj_list()
-    else:
-        w.window.show_message_box("Error",
-                                  "Could not find scenes or object meshes folders " + scenes.scenes_path + "/" + scenes.objects_path)
-        print("Could not find scene or object meshes folder")
-        exit()
+    w.scene_load(start_image_num)
+    w.update_obj_list()
 
     # Run the event loop. This will not return until the last window is closed.
     gui.Application.instance.run()
