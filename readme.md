@@ -6,9 +6,7 @@ python3 -c "import OpenGL; print(OpenGL.__path__)"
 
 vi /opt/anaconda3/envs/annotate/lib/python3.6/site-packages/OpenGL/platform/ctypesloader.py
 
-# 原先的代码
 #fullName = util.find_library( name )
-# 新的代码
 fullName = '/System/Library/Frameworks/OpenGL.framework/OpenGL'
 
 brew install glew
