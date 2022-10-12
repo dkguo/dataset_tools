@@ -2,8 +2,7 @@
 ##### https://drive.google.com/file/d/137uO2Ya63cpf1RspiE3rbsAE-btkIovG/view?usp=sharing
 ##### https://drive.google.com/file/d/1PTNmhd-eSq0fwSPv0nvQN8h_scR1v-UJ/view?usp=sharing
 
-#### Unzip files and move models to data folder
-#### The director should look like this
+#### Unzip files and move models to data folder. The directory should look like this
 ```
 - data
     - scene_221012114441
