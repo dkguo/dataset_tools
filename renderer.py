@@ -4,9 +4,10 @@ import pyrender
 import trimesh
 
 from bop_toolkit.bop_toolkit_lib import renderer
+from config import dataset_path
 from loaders import load_intrinsics, load_ground_truth
 
-models_path = '/media/gdk/Data/Datasets/dex_data/models'
+models_path = f'{dataset_path}/models'
 obj_model_paths = {1: f'{models_path}/002_master_chef_can/textured_simple.obj',
                    2: f'{models_path}/003_cracker_box/textured_simple.obj',
                    3: f'{models_path}/004_sugar_box/textured_simple.obj',
@@ -29,7 +30,7 @@ obj_model_paths = {1: f'{models_path}/002_master_chef_can/textured_simple.obj',
                    20: f'{models_path}/052_extra_large_clamp/textured_simple.obj',
                    21: f'{models_path}/061_foam_brick/textured_simple.obj'}
 
-ply_models_path = '/media/gdk/Data/Datasets/bop_datasets/ycbv/models'
+ply_models_path = f'{dataset_path}/ply_models'
 ply_model_paths = {1: f'{ply_models_path}/obj_000001.ply',
                    2: f'{ply_models_path}/obj_000002.ply',
                    3: f'{ply_models_path}/obj_000003.ply',

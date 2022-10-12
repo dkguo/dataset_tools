@@ -3,7 +3,7 @@ import shutil
 import glob
 import numpy as np
 
-from bop_toolkit_lib.inout import save_im, save_depth
+from bop_toolkit.bop_toolkit_lib.inout import save_im, save_depth
 from loaders import get_camera_names, get_depth_scale
 
 
@@ -36,5 +36,5 @@ def npy2png(scene_path, start_frame=0):
 
 
 if __name__ == '__main__':
-    scene_path = '/home/gdk/data/scene_220603104027'
+    scene_path = '/Users/gdk/Downloads/data/scene_221012114441'
     npy2png(scene_path, start_frame=40)

@@ -8,6 +8,7 @@ Other annotations can be generated usign other scripts [calc_gt_info.py, calc_gt
 original repo: https://github.com/FLW-TUDO/3d_annotation_tool
 
 """
+import argparse
 
 import numpy as np
 import open3d as o3d
@@ -17,6 +18,7 @@ import os
 import json
 import cv2
 
+from config import dataset_path
 from loaders import load_intrinsics, get_depth_scale, get_camera_names, load_extrinsics
 from renderer import load_meshes, create_scene, model_names, render_obj_pose, overlay_imgs, ply_model_paths
 
@@ -602,12 +604,12 @@ class AppWindow:
         self.pc_scene_widget.scene.clear_geometry()
         geometry = None
 
-        cam_K = load_intrinsics(f'{self.scene_path}/camera_01/camera_meta.yml')
-        depth_scale = get_depth_scale(f'{self.scene_path}/camera_01/camera_meta.yml', convert2unit='m')
+        cam_K = load_intrinsics(f'{self.scene_path}/{self.camera_names[0]}/camera_meta.yml')
+        depth_scale = get_depth_scale(f'{self.scene_path}/{self.camera_names[0]}/camera_meta.yml', convert2unit='m')
 
-        rgb_path = os.path.join(self.scene_path, 'camera_01', 'rgb', f'{image_num:06}' + '.png')
+        rgb_path = os.path.join(self.scene_path, f'{self.camera_names[0]}', 'rgb', f'{image_num:06}' + '.png')
         rgb_img = cv2.imread(rgb_path)
-        depth_path = os.path.join(self.scene_path, 'camera_01', 'depth', f'{image_num:06}' + '.png')
+        depth_path = os.path.join(self.scene_path, f'{self.camera_names[0]}', 'depth', f'{image_num:06}' + '.png')
         depth_img = cv2.imread(depth_path, -1)
         depth_img = np.float32(depth_img * depth_scale)
 
@@ -643,7 +645,7 @@ class AppWindow:
             self._meshes_used.set_items([])  # clear list from last loaded scene
 
             # load values if an annotation already exists
-            scene_gt_path = os.path.join(self.scene_path, 'camera_01', 'scene_gt.json')
+            scene_gt_path = os.path.join(self.scene_path, f'{self.camera_names[0]}', 'scene_gt.json')
             with open(scene_gt_path) as scene_gt_file:
                 data = json.load(scene_gt_file)
                 scene_data = data[str(image_num)]
@@ -739,9 +741,9 @@ class AppWindow:
             return
 
         num = len(
-            next(os.walk(os.path.join(self.scene_path, 'camera_01', 'depth')))[2])
+            next(os.walk(os.path.join(self.scene_path, f'{self.camera_names[0]}', 'depth')))[2])
         if self._annotation_scene.image_num + 1 >= len(
-                next(os.walk(os.path.join(self.scene_path, 'camera_01', 'depth')))[
+                next(os.walk(os.path.join(self.scene_path, f'{self.camera_names[0]}', 'depth')))[
                     2]):  # 2 for files which here are the how many depth images
             self._on_error("There is no next image.")
             return
@@ -758,8 +760,14 @@ class AppWindow:
 
 
 def main():
-    scene_path = '/home/gdk/data/scene_220603104027'
-    start_image_num = 20
+    parser = argparse.ArgumentParser(description='Annotation tool.')
+    parser.add_argument('--scene_name', default='scene_221012114441')
+    parser.add_argument('--start_frame', type=int, default=104)
+
+    args = parser.parse_args()
+    scene_name = args.scene_name
+    scene_path = f'{dataset_path}/{scene_name}'
+    start_image_num = args.start_frame
 
     gui.Application.instance.initialize()
     w = AppWindow(2048, 1536, scene_path)
