@@ -46,8 +46,7 @@ vi /opt/anaconda3/envs/annotate/lib/python3.6/site-packages/OpenGL/platform/ctyp
 fullName = '/System/Library/Frameworks/OpenGL.framework/OpenGL'
 ```
 
-##### If you are on Ubuntu, you may below packages to run pyOpenGL
+##### If you are on Ubuntu, you may following packages to run pyOpenGL
 ```
-sudo apt-get install libosmesa6-dev
-sudo apt-get install freeglut3-dev
+sudo apt-get install libosmesa6-dev freeglut3-dev
 ```
