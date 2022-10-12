@@ -1,33 +1,41 @@
-#### Download following files
-##### https://drive.google.com/file/d/137uO2Ya63cpf1RspiE3rbsAE-btkIovG/view?usp=sharing
-##### https://drive.google.com/file/d/1PTNmhd-eSq0fwSPv0nvQN8h_scR1v-UJ/view?usp=sharing
+## Installation
+#### 1. Download following files
+##### Sample data: https://drive.google.com/file/d/137uO2Ya63cpf1RspiE3rbsAE-btkIovG/view?usp=sharing
+##### YCBV Models: https://drive.google.com/file/d/1PTNmhd-eSq0fwSPv0nvQN8h_scR1v-UJ/view?usp=sharing
 
-#### Unzip files and move models to data folder. The directory should look like this
+#### 2. Unzip files and move the folder `models` into the `data` folder. The directory should look like this
 ```
 - data
     - scene_221012114441
     - models
 ```
 
-#### Clone this git
+#### 3. Clone this git
 ```
 git clone https://github.com/dkguo/dataset_tools
 cd dataset_tools
 ```
 
-#### Change dataset_path in config.py to the path of data folder
+#### 4. Change `dataset_path` in `config.py` to the path of `data` folder
 ```
 dataset_path = 'YOUR_PATH/data'
 ```
 
-#### Create environment and install necessary packages
+#### 5. Create environment and install necessary packages
 ```
 conda create --name annotate python=3.6
 conda activate annotate
 pip install -r requirements.txt
 ```
 
-##### If you are are on MacOS, you may need code below to install pyOpenGL properly
+#### 6. Make sure OpenGL can be properly imported
+##### If following line of code returns nothing, which means python can import OpenGL properly, you can skip this section.
+```
+python -c "from OpenGL.GL import *"
+```
+
+##### If you get the error like `'Unable to load OpenGL library'`, try the troubleshoot code below:
+##### For MacOS:
 ```
 brew install glew
 brew install glfw3
@@ -48,12 +56,19 @@ vi /opt/anaconda3/envs/annotate/lib/python3.6/site-packages/OpenGL/platform/ctyp
 fullName = '/System/Library/Frameworks/OpenGL.framework/OpenGL'
 ```
 
-##### If you are on Ubuntu, you may following packages to run pyOpenGL
+##### For Ubuntu Linux: you may following packages to run pyOpenGL
 ```
 sudo apt-get install libosmesa6-dev freeglut3-dev
 ```
 
-### How to use annotation tool
+## Annotation Tool Usage
+#### run the annotate_obj_pose.py script
 ```
-python -m annotate.annotate_obj_pose
+python -m annotate.annotate_obj_pose --scene_name {scene_name} --start_frame {num}
+
+# for example (also the default values)
+python -m annotate.annotate_obj_pose --scene_name scene_221012114441 --start_frame 104
 ```
+
+#### Control Keys
+
