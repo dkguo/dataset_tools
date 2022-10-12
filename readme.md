@@ -12,6 +12,7 @@
 #### Clone this git
 ```
 git clone https://github.com/dkguo/dataset_tools
+cd dataset_tools
 ```
 
 #### Change dataset_path in config.py to the path of data folder
@@ -21,7 +22,8 @@ dataset_path = 'YOUR_PATH/data'
 
 #### Create environment and install necessary packages
 ```
-conda create --name annotate python==3.6
+conda create --name annotate python=3.6
+conda activate annotate
 pip install -r requirements.txt
 ```
 
@@ -49,4 +51,9 @@ fullName = '/System/Library/Frameworks/OpenGL.framework/OpenGL'
 ##### If you are on Ubuntu, you may following packages to run pyOpenGL
 ```
 sudo apt-get install libosmesa6-dev freeglut3-dev
+```
+
+### How to use annotation tool
+```
+python -m annotate.annotate_obj_pose
 ```
