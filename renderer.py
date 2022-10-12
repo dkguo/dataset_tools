@@ -2,8 +2,8 @@ import cv2
 import numpy as np
 import pyrender
 import trimesh
-from bop_toolkit_lib import renderer
 
+from bop_toolkit.bop_toolkit_lib import renderer
 from loaders import load_intrinsics, load_ground_truth
 
 models_path = '/media/gdk/Data/Datasets/dex_data/models'

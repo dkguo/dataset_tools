@@ -16,7 +16,6 @@ import open3d.visualization.rendering as rendering
 import os
 import json
 import cv2
-import warnings
 
 from loaders import load_intrinsics, get_depth_scale, get_camera_names, load_extrinsics
 from renderer import load_meshes, create_scene, model_names, render_obj_pose, overlay_imgs, ply_model_paths
