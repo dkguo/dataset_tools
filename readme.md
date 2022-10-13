@@ -2,7 +2,7 @@
 #### 1. Download and unzip following files
 Sample data: https://drive.google.com/file/d/137uO2Ya63cpf1RspiE3rbsAE-btkIovG/view?usp=sharing
 
-YCBV Models: https://drive.google.com/file/d/1PTNmhd-eSq0fwSPv0nvQN8h_scR1v-UJ/view?usp=sharing
+YCBV Models: https://drive.google.com/file/d/1gmcDD-5bkJfcMKLZb3zGgH_HUFbulQWu/view?usp=sharing
 
 
 #### 2. Move the folder `models` into the `data` folder. The directory should look like this:
@@ -37,10 +37,14 @@ python -c "from OpenGL.GL import *"
 ```
 
 ##### If you get the error like `'Unable to load OpenGL library'`, try the troubleshoot code below:
+##### For Ubuntu Linux: you may following packages to run pyOpenGL
+```
+sudo apt-get install libosmesa6-dev freeglut3-dev
+```
+
 ##### For MacOS:
 ```
-brew install glew
-brew install glfw3
+brew install glew glfw
 
 # get path of OpenGL
 python3 -c "import OpenGL; print(OpenGL.__path__)"
@@ -58,10 +62,6 @@ vi /opt/anaconda3/envs/annotate/lib/python3.6/site-packages/OpenGL/platform/ctyp
 fullName = '/System/Library/Frameworks/OpenGL.framework/OpenGL'
 ```
 
-##### For Ubuntu Linux: you may following packages to run pyOpenGL
-```
-sudo apt-get install libosmesa6-dev freeglut3-dev
-```
 
 ## Annotation Tool Usage
 #### run the annotate_obj_pose.py script

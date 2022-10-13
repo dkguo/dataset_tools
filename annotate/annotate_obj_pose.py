@@ -282,8 +282,8 @@ class AppWindow:
                 dist = 0.05
                 deg = 90
             elif event.type == gui.KeyEvent.UP:
-                dist = 0.005
-                deg = 1
+                dist = 0.015
+                deg = 5
             return gui.Widget.EventCallbackResult.HANDLED
 
         # Change camera view
