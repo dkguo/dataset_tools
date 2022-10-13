@@ -132,6 +132,11 @@ def render_obj_pose(renderer, dict_id_poses, width=640, height=480, unit='m'):
             pose_copy[2] *= -1
             if unit == 'mm':
                 pose_copy[:3, 3] /= 1000.0
+
+            if id not in meshes:
+                new_meshes = load_meshes([id])
+                meshes[id] = new_meshes[id]
+
             scene.add(meshes[id], pose=pose_copy)
 
     r = pyrender.OffscreenRenderer(viewport_width=width, viewport_height=height)

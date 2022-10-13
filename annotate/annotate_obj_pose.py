@@ -109,7 +109,7 @@ class AppWindow:
 
     def __init__(self, width, height, scene_path):
         self.active_camera_view = 0
-        self.pre_load_meshes = load_meshes([1, 13])
+        self.pre_load_meshes = {}
         self.camera_names = sorted(get_camera_names(scene_path))
         self.py_renderers = []
         for camera in self.camera_names:
@@ -761,8 +761,8 @@ class AppWindow:
 
 def main():
     parser = argparse.ArgumentParser(description='Annotation tool.')
-    parser.add_argument('--scene_name', default='scene_221012114441')
-    parser.add_argument('--start_frame', type=int, default=104)
+    parser.add_argument('--scene_name', default='scene_220603104027')
+    parser.add_argument('--start_frame', type=int, default=20)
 
     args = parser.parse_args()
     scene_name = args.scene_name
