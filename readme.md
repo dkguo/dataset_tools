@@ -69,8 +69,9 @@ sudo apt-get install libosmesa6-dev freeglut3-dev
 python -m annotate.annotate_obj_pose --scene_name {scene_name} --start_frame {num}
 
 # for example (also the default values)
-python -m annotate.annotate_obj_pose --scene_name scene_221012114441 --start_frame 104
+python -m annotate.annotate_obj_pose --scene_name scene_220603104027 --start_frame 20
 ```
 
 #### Control Keys
+<img src="instructions.png" alt="control keys"/>
 
