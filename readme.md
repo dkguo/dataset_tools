@@ -2,7 +2,7 @@
 #### 1. Download and unzip following files
 Sample data: https://drive.google.com/file/d/137uO2Ya63cpf1RspiE3rbsAE-btkIovG/view?usp=sharing
 
-YCBV Models: https://drive.google.com/file/d/1gmcDD-5bkJfcMKLZb3zGgH_HUFbulQWu/view?usp=sharing
+YCBV Models: https://drive.google.com/file/d/1lsxEe8amxp4pPq-IE4AMMgR3dfSbDOFQ/view?usp=sharing
 
 
 #### 2. Move the folder `models` into the `data` folder. The directory should look like this:
