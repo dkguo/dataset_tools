@@ -37,7 +37,7 @@ python -c "from OpenGL.GL import *"
 ```
 
 ##### If you get the error like `'Unable to load OpenGL library'`, try the troubleshoot code below:
-##### For Ubuntu Linux: you may following packages to run pyOpenGL
+##### For Ubuntu Linux: you may need following packages to run pyOpenGL
 ```
 sudo apt-get install libosmesa6-dev freeglut3-dev
 ```
