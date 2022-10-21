@@ -1,3 +1,5 @@
+import pickle
+from datetime import datetime
 import json
 import os
 import time
@@ -7,6 +9,7 @@ import numpy as np
 import pyrealsense2 as rs
 import yaml
 
+from config import dataset_path
 from record.realsense_device_manager import DeviceManager
 
 
@@ -14,17 +17,18 @@ from record.realsense_device_manager import DeviceManager
 resolution_width = 640  # pixels
 resolution_height = 480  # pixels
 frame_rate = 15  # fps
-dataset_path = '/Downloads/data'
-scene_name = int(time.time())
+scene_name = 'scene_' + datetime.now().strftime("%y%m%d%H%M")
 
 
 try:
     rs_config = rs.config()
     rs_config.enable_stream(rs.stream.depth, resolution_width, resolution_height, rs.format.z16, frame_rate)
-    rs_config.enable_stream(rs.stream.infrared, 1, resolution_width, resolution_height, rs.format.y8, frame_rate)
+    # rs_config.enable_stream(rs.stream.infrared, 1, resolution_width, resolution_height, rs.format.y8, frame_rate)
     rs_config.enable_stream(rs.stream.color, resolution_width, resolution_height, rs.format.bgr8, frame_rate)
 
+    print('creating device manager...')
     device_manager = DeviceManager(rs.context(), rs_config)
+    print('Enabling all devices...')
     device_manager.enable_all_devices()
 
     assert (len(device_manager._available_devices) > 0)
@@ -51,25 +55,25 @@ try:
 
     # create scene folder
     scene_path = f'{dataset_path}/{scene_name}'
-    print(scene_path)
+    print('Saving data to', scene_path)
     os.mkdir(scene_path)
 
     # create camera folders
     dict_cameras_k_path = {}
     for i, k in enumerate(frames.keys()):
-        camera_name = f'camera_{i+1:02d}'
+        camera_name = f'camera_{i+1:02d}_{k[0]}'
         camera_path = f'{scene_path}/{camera_name}'
         os.mkdir(camera_path)
         os.mkdir(f'{camera_path}/rgb')
         os.mkdir(f'{camera_path}/depth')
-        dict_cameras_k_path[k] = camera_path
+        dict_cameras_k_path[k[0]] = camera_path
 
     # save intrinsics
     intrinsics_devices = device_manager.get_device_intrinsics(frames)
     for k in intrinsics_devices.keys():
         intrinsics = intrinsics_devices[k][rs.stream.color]
         fx, fy, px, py = intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy
-        print(fx, fy, px, py)
+        print(k, fx, fy, px, py)
 
         camera_path = dict_cameras_k_path[k]
         with open(f'{camera_path}/camera_meta.yml', 'w') as file:
@@ -85,6 +89,12 @@ try:
     print("recording...")
     time_list = []
     prev_time = time.time()
+
+    savers = []
+
+    for i in range(2):
+        savers.append(rs.save_single_frameset(f'{scene_path}/{i}'))
+
     while True:
         cur_time = time.time()
         time_list.append(cur_time)
@@ -93,12 +103,22 @@ try:
             prev_time = cur_time
         frames = device_manager.poll_frames()
         for k in frames.keys():
-            color_image = np.asanyarray(frames[k][rs.stream.color].get_data())
-            depth_image = np.asanyarray(frames[k][rs.stream.depth].get_data())
+            # color_image = np.asanyarray(frames[k][rs.stream.color].get_data())
+            # depth_image = np.asanyarray(frames[k][rs.stream.depth].get_data())
 
-            camera_path = dict_cameras_k_path[k]
+            color_image = frames[k][rs.stream.color].get_data()
+            depth_image = frames[k][rs.stream.depth].get_data()
+
+            camera_path = dict_cameras_k_path[k[0]]
             np.save(f'{camera_path}/rgb/{i:06d}.npy', color_image)
             np.save(f'{camera_path}/depth/{i:06d}.npy', depth_image)
+
+        # framesets = device_manager.poll_framesets()
+        # for c, (k, frameset) in enumerate(framesets.items()):
+        #     savers[c].process(frameset)
+
+
+
 
         i += 1
 
@@ -108,6 +128,7 @@ except KeyboardInterrupt:
 
     print("The program was interupted by the user. Closing the program...")
 
-finally:
-    device_manager.disable_streams()
-    cv2.destroyAllWindows()
+# finally:
+#     print("Disabling streams...")
+#     # device_manager.disable_streams()
+#     cv2.destroyAllWindows()

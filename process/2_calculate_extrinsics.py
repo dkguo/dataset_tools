@@ -37,5 +37,5 @@ def process_extrinsics(scene_path, tag_size, master_tag_id, master_image_id):
 
 
 if __name__ == '__main__':
-    scene_path = '/Users/gdk/Downloads/data/scene_221012114441'
-    process_extrinsics(scene_path, tag_size=0.06, master_tag_id=0, master_image_id=0)
+    scene_path = '/media/psf/Home/Downloads/data/scene_221012114441'
+    process_extrinsics(scene_path, tag_size=0.1, master_tag_id=0, master_image_id=0)

@@ -3,7 +3,7 @@
 ##################################################################################################
 ##                  Box Dimensioner with multiple cameras: Helper files                       ####
 ##################################################################################################
-
+import time
 
 import pyrealsense2 as rs
 import numpy as np
@@ -42,11 +42,14 @@ def enumerate_connected_devices(context):
     connect_device = []
 
     for d in context.devices:
+        print(d)
         if d.get_info(rs.camera_info.name).lower() != 'platform camera':
             serial = d.get_info(rs.camera_info.serial_number)
             product_line = d.get_info(rs.camera_info.product_line)
             device_info = (serial, product_line) # (serial_number, product_line)
             connect_device.append( device_info )
+    print('returning')
+    print(connect_device)
     return connect_device
 
 
@@ -136,12 +139,28 @@ class DeviceManager:
         assert isinstance(D400_pipeline_configuration, type(rs.config()))
         assert isinstance(L500_pipeline_configuration, type(rs.config()))
         self._context = context
-        self._available_devices = enumerate_connected_devices(context)
+        print('Enumerating all devices')
+        connect_device = []
+
+        for d in context.devices:
+            print(d)
+            if d.get_info(rs.camera_info.name).lower() != 'platform camera':
+                serial = d.get_info(rs.camera_info.serial_number)
+                product_line = d.get_info(rs.camera_info.product_line)
+                device_info = (serial, product_line)  # (serial_number, product_line)
+                connect_device.append(device_info)
+                time.sleep(1)
+        # print(connect_device)
+
+        # tmp = enumerate_connected_devices(context)
+        print('Enumerated all devices')
+        self._available_devices = connect_device
         self._enabled_devices = {} #serial numbers of te enabled devices
         self.D400_config = D400_pipeline_configuration
         self.L500_config = L500_pipeline_configuration
         self._frame_counter = 0
         self.align = rs.align(rs.stream.color)
+        print('DeviceManager initialized')
 
     def enable_device(self, device_info, enable_ir_emitter):
         """
@@ -163,6 +182,7 @@ class DeviceManager:
         if product_line == "L500":
             # Enable L515 device
             self.L500_config.enable_device(device_serial)
+            self.L500_config.disable_all_streams()
             pipeline_profile = pipeline.start(self.L500_config)
         else: 
             # Enable D400 device
@@ -184,6 +204,7 @@ class DeviceManager:
         print(str(len(self._available_devices)) + " devices have been found")
 
         for device_info in self._available_devices:
+            print('Enabling', device_info, '...')
             self.enable_device(device_info, enable_ir_emitter)
 
     def enable_emitter(self, enable_ir_emitter=True):
@@ -207,7 +228,7 @@ class DeviceManager:
         """
 
         with open(path_to_settings_file, 'r') as file:
-        	json_text = file.read().strip()
+            json_text = file.read().strip()
 
         for (device_serial, device) in self._enabled_devices.items():
             if device.product_line == "L500":
@@ -229,7 +250,7 @@ class DeviceManager:
         while len(frames) < len(self._enabled_devices.items()) :
             for (serial, device) in self._enabled_devices.items():
                 streams = device.pipeline_profile.get_streams()
-                frameset = device.pipeline.poll_for_frames() #frameset will be a pyrealsense2.composite_frame object
+                frameset = device.pipeline.wait_for_frames() #frameset will be a pyrealsense2.composite_frame object
 #                print(frameset)
                 if frameset.size() == 0:
                   continue
@@ -248,6 +269,29 @@ class DeviceManager:
                         frames[dev_info][key_] = frame
 
         return frames
+
+    def poll_framesets(self):
+
+        framesets = {}
+        while len(framesets) < len(self._enabled_devices.items()):
+            for (serial, device) in self._enabled_devices.items():
+                streams = device.pipeline_profile.get_streams()
+                frameset = device.pipeline.poll_for_frames()  # frameset will be a pyrealsense2.composite_frame object
+                if frameset.size() == 0:
+                    continue
+                if frameset.size() == len(streams):
+                    dev_info = (serial, device.product_line)
+                    framesets[dev_info] = frameset
+                    # for stream in streams:
+                    #     if (rs.stream.infrared == stream.stream_type()):
+                    #         frame = frameset.get_infrared_frame(stream.stream_index())
+                    #         key_ = (stream.stream_type(), stream.stream_index())
+                    #     else:
+                    #         frame = frameset.first_or_default(stream.stream_type())
+                    #         key_ = stream.stream_type()
+                    #     frames[dev_info][key_] = frame
+
+        return framesets
 
     def get_depth_shape(self):
         """ 
