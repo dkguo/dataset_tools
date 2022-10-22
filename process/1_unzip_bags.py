@@ -1,4 +1,5 @@
 import glob
+import json
 import multiprocessing
 import os
 from datetime import datetime
@@ -12,7 +13,7 @@ import yaml
 from bop_toolkit.bop_toolkit_lib.inout import save_im, save_depth
 from config import dataset_path
 from process import scene_name
-from record.record_multiple_d435 import resolution_width, resolution_height
+from record_multiple_d435 import resolution_width, resolution_height
 
 
 def unzip_bag(camera_num, bag_path):
@@ -26,31 +27,23 @@ def unzip_bag(camera_num, bag_path):
         os.mkdir(f'{camera_path}/rgb')
         os.mkdir(f'{camera_path}/depth')
 
+    # create realsense config
     pipeline = rs.pipeline()
     config = rs.config()
     rs.config.enable_device_from_file(config, bag_path)
-
     config.enable_stream(rs.stream.depth, rs.format.z16)
     config.enable_stream(rs.stream.color, rs.format.bgr8)
-
     profile = pipeline.start(config)
-
     playback = profile.get_device().as_playback()
     playback.set_real_time(False)
-
     align = rs.align(rs.stream.color)
 
     # save intrinsics
     frameset = pipeline.wait_for_frames()
     frameset = align.process(frameset)
     prev_time = frameset.get_timestamp() / 1000
-
-    for stream, frame in frameset.items():
-        if stream == rs.stream.color:
-            intrinsics = frame.get_profile().as_video_stream_profile().get_intrinsics()
-
+    intrinsics = frameset.get_profile().as_video_stream_profile().get_intrinsics()
     fx, fy, px, py = intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy
-
     with open(f'{camera_path}/camera_meta.yml', 'w') as file:
         assert True
         save_str = {'INTRINSICS': [fx, 0.0, px, 0.0, fy, py, 0.0, 0.0, 1.0],
@@ -59,14 +52,14 @@ def unzip_bag(camera_num, bag_path):
                     'FRAME_HEIGHT': resolution_height}
         yaml.dump(save_str, file)
 
-    return
-
-
+    # save frame to png
     frame_num = 0
+    dict_i_time = {}
     while True:
         frameset = pipeline.wait_for_frames()
         frameset = align.process(frameset)
         timestamp = frameset.get_timestamp() / 1000
+        dict_i_time[frame_num] = timestamp
         if timestamp < prev_time:
             break
         prev_time = timestamp
@@ -92,16 +85,19 @@ def unzip_bag(camera_num, bag_path):
 
         frame_num += 1
 
+    with open(f'{camera_path}/time.json', 'w') as file:
+        json.dump(dict_i_time, file)
+
 
 if __name__ == '__main__':
     bag_paths = glob.glob(f'{dataset_path}/{scene_name}/*.bag')
     print(len(bag_paths), 'have been found:')
     print(bag_paths)
 
-    # args = []
-    # for i, bag_path in enumerate(bag_paths):
-    #     args.append((i + 1, bag_path))
-    #
-    # multiprocessing.set_start_method('spawn')
-    # with Pool() as pool:
-    #     pool.starmap(unzip_bag, args)
+    args = []
+    for i, bag_path in enumerate(bag_paths):
+        args.append((i + 1, bag_path))
+
+    multiprocessing.set_start_method('spawn')
+    with Pool() as pool:
+        pool.starmap(unzip_bag, args)
