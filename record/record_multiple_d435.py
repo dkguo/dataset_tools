@@ -14,7 +14,7 @@ from process.apriltag_detection import detect_april_tag
 
 resolution_width = 640  # pixels
 resolution_height = 480  # pixels
-frame_rate = 15  # fps
+frame_rate = 30  # fps
 april_tag_size = 0.08
 scene_name = 'scene_' + datetime.now().strftime("%y%m%d%H%M")
 
@@ -91,7 +91,7 @@ if __name__ == '__main__':
                 depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.3), cv2.COLORMAP_JET)
                 images = np.hstack((color_im_w_tag, depth_colormap))
 
-                cv2.namedWindow('Camera', cv2.WINDOW_NORMAL)
+                cv2.namedWindow('Camera', cv2.WINDOW_AUTOSIZE)
                 cv2.imshow('Camera', images)
 
                 key = cv2.waitKey(1)
@@ -119,11 +119,8 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print("The program was interupted by the user. Closing the program...")
 
-        serials = sorted(devices.keys())
-        # for serial, device in devices.items():
-        for serial in serials:
-            devices[serial].pipeline.stop()
-            # device.pipeline.stop()
+        for serial, device in devices.items():
+            device.pipeline.stop()
             print(serial, 'stopped')
 
         print("All devices are stopped")

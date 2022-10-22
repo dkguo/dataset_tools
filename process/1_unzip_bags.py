@@ -13,7 +13,7 @@ import yaml
 from bop_toolkit.bop_toolkit_lib.inout import save_im, save_depth
 from config import dataset_path
 from process import scene_name
-from record_multiple_d435 import resolution_width, resolution_height
+from record.record_multiple_d435 import resolution_width, resolution_height
 
 
 def unzip_bag(camera_num, bag_path):
