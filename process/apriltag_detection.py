@@ -98,14 +98,16 @@ def detect_april_tag(orig, camera_params, tag_size, visualize=False, save_path=N
     detector = apriltag.Detector()
     detections, dimg = detector.detect(gray, return_image=True)
 
-    if len(orig.shape) == 3:
+    num_detections = len(detections)
+    if verbose:
+        print(f'Detected {num_detections} tags')
+
+    if num_detections == 0:
+        overlay = orig
+    elif len(orig.shape) == 3:
         overlay = orig // 2 + dimg[:, :, None] // 2
     else:
         overlay = orig // 2 + dimg // 2
-
-    num_detections = len(detections)
-    if verbose:
-        print('Detected {} tags in {}\n'.format(num_detections, os.path.split(imagepath)[1]))
 
     poses = []
     for i, detection in enumerate(detections):
@@ -115,15 +117,15 @@ def detect_april_tag(orig, camera_params, tag_size, visualize=False, save_path=N
             print(detection.tostring(indent=2))
 
         if camera_params is not None:
-            pose, e0, e1 = detector.detection_pose(detection, camera_params, tag_size)
-            poses.append((detection.tag_id, pose))
+            pose, e0, ef = detector.detection_pose(detection, camera_params, tag_size)
+            poses.append((detection.tag_id, pose, ef))
             draw_pose(overlay, camera_params, tag_size, pose)
             draw_pose_axes(overlay, camera_params, tag_size, pose, detection.center)
             annotate_detection(overlay, detection, tag_size)
 
             if verbose:
                 print(detection.tostring(collections.OrderedDict([('Pose',pose),
-                    ('InitError', e0), ('FinalError', e1)]), indent=2))
+                                                                  ('InitError', e0), ('FinalError', ef)]), indent=2))
 
     if visualize:
         cv2.imshow('apriltag', overlay)
@@ -132,7 +134,7 @@ def detect_april_tag(orig, camera_params, tag_size, visualize=False, save_path=N
         cv2.destroyAllWindows()
 
     if save_path is not None:
-        cv2.imwrite(output_path, overlay)
+        cv2.imwrite(save_path, overlay)
 
     return poses, overlay
 

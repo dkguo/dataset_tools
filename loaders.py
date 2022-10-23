@@ -15,24 +15,22 @@ def get_camera_names(scene_path):
     for f in folders:
         if f[:7] == 'camera_':
             camera_seq.append(f)
-    return camera_seq
+    return sorted(camera_seq)
 
 
 def frame_number(scene_path):
     camera_seq = get_camera_names(scene_path)
     nums = []
     for camera in camera_seq:
-        files = glob.glob(f'{scene_path}/{camera}/*depth.png')
+        files = glob.glob(f'{scene_path}/{camera}/rgb/*.png')
         nums.append(len(files))
     return min(nums)
 
 
-def save_video(imgs, save_path, video_name='video'):
-    if not os.path.exists(save_path):
-        os.mkdir(save_path)
-    print(save_path, f'Saving {video_name}.mp4')
-    out_video = cv2.VideoWriter(f'{save_path}/{video_name}.mp4',
-                                cv2.VideoWriter_fourcc(*'mp4v'), 15, (640, 480))
+def save_mp4(imgs, video_save_path, frame_rate=15, dim=(640, 480)):
+    assert video_save_path[-3:] == 'mp4', 'video_save_path has to end with mp4'
+    print(f'Saving {video_save_path}')
+    out_video = cv2.VideoWriter(f'{video_save_path}', cv2.VideoWriter_fourcc(*'mp4v'), frame_rate, dim)
     for im in imgs:
         out_video.write(im)
     out_video.release()
@@ -43,20 +41,7 @@ def save_imgs(imgs, save_path, uniqname=None):
         os.mkdir(save_path)
     print(save_path, f'Saving {uniqname if uniqname is not None else ""}.png')
     for frame, im in enumerate(imgs):
-        cv2.imwrite(f'{save_path}/{frame}{uniqname if uniqname is not None else ""}.png', im)
-
-
-def imgs_to_video(imgs_path, save_path, uniqname):
-    if not os.path.exists(save_path):
-        os.mkdir(save_path)
-    print(save_path, 'Converting imgs to video.mp4')
-    out_video = cv2.VideoWriter(f'{save_path}/video.mp4',
-                                cv2.VideoWriter_fourcc(*'mp4v'), 15, (640, 480))
-
-    imgs = load_images(imgs_path, uniqname)
-    for im in imgs:
-        out_video.write(im)
-    out_video.release()
+        cv2.imwrite(f'{save_path}/{frame:06d}{uniqname if uniqname is not None else ""}.png', im)
 
 
 def load_images(imgs_path, uniqname, mode=cv2.IMREAD_COLOR):
@@ -77,15 +62,12 @@ def load_images(imgs_path, uniqname, mode=cv2.IMREAD_COLOR):
     return imgs
 
 
-def load_npys(scene_path, camera, img_type, verbose=False):
-    npys = []
-    num_frame = frame_number(scene_path)
-    for frame in range(num_frame):
-        path = f'{scene_path}/{camera}/{frame:06d}_{img_type}.npy'
-        if verbose:
-            print(path)
-        npys.append(np.load(path))
-    return npys
+def load_imgs_across_cameras(scene_path, camera_names, image_name, mode=cv2.IMREAD_COLOR):
+    imgs = []
+    for camera_name in camera_names:
+        im = cv2.imread(f'{scene_path}/{camera_name}/rgb/{image_name}', mode)
+        imgs.append(im)
+    return imgs
 
 
 def load_intrinsics(camera_meta_path):
@@ -97,11 +79,9 @@ def load_intrinsics(camera_meta_path):
 def load_extrinsics(extrinsics_path):
     with open(extrinsics_path, 'r') as file:
         y = yaml.full_load(file)
-
     ext = y['extrinsics']
     for k, e in ext.items():
         ext[k] = np.array(e)
-
     return ext
 
 

@@ -11,15 +11,13 @@ import cv2
 import yaml
 
 from bop_toolkit.bop_toolkit_lib.inout import save_im, save_depth
-from config import dataset_path
-from process import scene_name
-from record.record_multiple_d435 import resolution_width, resolution_height
+from config import dataset_path, resolution_width, resolution_height
 
 
-def unzip_bag(camera_num, bag_path):
-    camera_serial = os.path.basename(bag_path)[:-4]
+def unzip_bag(bag_path):
+    camera_name = os.path.basename(bag_path)[:-4]
     print('processing', bag_path)
-    camera_path = f'{dataset_path}/{scene_name}/camera_{camera_num:02d}_{camera_serial}'
+    camera_path = bag_path[:-4]
 
     # create folders
     if not os.path.exists(camera_path):
@@ -80,7 +78,7 @@ def unzip_bag(camera_num, bag_path):
         image = np.hstack((color_image, depth_colormap))
         text = f'Frame: {frame_num}, Time: {datetime.fromtimestamp(timestamp).strftime("%H:%M:%S.%f")}'
         image = cv2.putText(image, text, (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), thickness=2)
-        cv2.imshow(f'camera_{camera_num:02d}_{camera_serial}', image)
+        cv2.imshow(f'{camera_name}', image)
         cv2.waitKey(1)
 
         frame_num += 1
@@ -89,15 +87,16 @@ def unzip_bag(camera_num, bag_path):
         json.dump(dict_i_time, file)
 
 
-if __name__ == '__main__':
+def unzip_bags(scene_name):
     bag_paths = glob.glob(f'{dataset_path}/{scene_name}/*.bag')
     print(len(bag_paths), 'have been found:')
     print(bag_paths)
 
-    args = []
-    for i, bag_path in enumerate(bag_paths):
-        args.append((i + 1, bag_path))
-
     multiprocessing.set_start_method('spawn')
     with Pool() as pool:
-        pool.starmap(unzip_bag, args)
+        pool.map(unzip_bag, bag_paths)
+
+
+if __name__ == '__main__':
+    scene_name = 'scene_2210230220'
+    unzip_bags(scene_name)
