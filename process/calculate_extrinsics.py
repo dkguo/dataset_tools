@@ -7,7 +7,7 @@ from loaders import get_camera_names, load_intrinsics
 from process.apriltag_detection import detect_april_tag
 from process.helpers import add_texts, add_border, collage_imgs
 
-apriltag_detect_error_thres = 0.05
+apriltag_detect_error_thres = 0.5
 
 
 def process_extrinsics(camera_names_image_params, tag_size, save_path=None):
