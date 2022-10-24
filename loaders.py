@@ -12,9 +12,9 @@ import yaml
 def get_camera_names(scene_path):
     folders = os.listdir(scene_path)
     camera_seq = []
-    for f in folders:
-        if f[:7] == 'camera_':
-            camera_seq.append(f)
+    for folder in folders:
+        if folder[:7] == 'camera_' and os.path.isdir(f'{scene_path}/{folder}'):
+            camera_seq.append(folder)
     return sorted(camera_seq)
 
 
@@ -27,8 +27,9 @@ def frame_number(scene_path):
     return min(nums)
 
 
-def save_mp4(imgs, video_save_path, frame_rate=15, dim=(640, 480)):
+def save_mp4(imgs, video_save_path, frame_rate=15):
     assert video_save_path[-3:] == 'mp4', 'video_save_path has to end with mp4'
+    dim = (imgs[0].shape[1], imgs[0].shape[0])
     print(f'Saving {video_save_path}')
     out_video = cv2.VideoWriter(f'{video_save_path}', cv2.VideoWriter_fourcc(*'mp4v'), frame_rate, dim)
     for im in imgs:
