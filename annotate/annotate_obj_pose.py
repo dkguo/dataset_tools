@@ -739,13 +739,16 @@ class AppWindow:
 
         imgs = []
         for i, camera_name in enumerate(self.camera_names):
-            # change pose to corresponding camera view
-            dict_id_poses = {}
-            for obj_id, pose in obj_ext_poses.items():
-                dict_id_poses[obj_id] = np.linalg.inv(self.extrinsics[camera_name]) @ pose
+            if len(objs) > 0:
+                # change pose to corresponding camera view
+                dict_id_poses = {}
+                for obj_id, pose in obj_ext_poses.items():
+                    dict_id_poses[obj_id] = np.linalg.inv(self.extrinsics[camera_name]) @ pose
 
-            py_rendered_im = render_obj_pose(self.py_renderers[i], dict_id_poses)
-            im = overlay_imgs(self.rgb_imgs[i], py_rendered_im, 1, 0.8)
+                py_rendered_im = render_obj_pose(self.py_renderers[i], dict_id_poses)
+                im = overlay_imgs(self.rgb_imgs[i], py_rendered_im, 1, 0.8)
+            else:
+                im = self.rgb_imgs[i]
             im = cv2.putText(im, camera_name[:9], (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), thickness=2)
             if i == self.active_camera_view:
                 im = add_border(im)
@@ -805,11 +808,14 @@ class AppWindow:
         self._update_rgb_views()
         self._annotation_changed = True
 
+    def _on_fill_annotation_from_last_avaiable_frame(self):
+        return
+
 
 def main():
     parser = argparse.ArgumentParser(description='Annotation tool.')
     parser.add_argument('--scene_name', default='scene_2210232307_01')
-    parser.add_argument('--start_frame', type=int, default=24)
+    parser.add_argument('--start_frame', type=int, default=100)
 
     args = parser.parse_args()
     scene_name = args.scene_name
