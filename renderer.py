@@ -1,3 +1,7 @@
+import os
+# os.environ['PYOPENGL_PLATFORM'] = 'egl'
+import time
+
 import cv2
 import numpy as np
 import pyrender
@@ -28,7 +32,8 @@ obj_model_paths = {1: f'{models_path}/002_master_chef_can/textured_simple.obj',
                    18: f'{models_path}/040_large_marker/textured_simple.obj',
                    19: f'{models_path}/051_large_clamp/textured_simple.obj',
                    20: f'{models_path}/052_extra_large_clamp/textured_simple.obj',
-                   21: f'{models_path}/061_foam_brick/textured_simple.obj'}
+                   21: f'{models_path}/061_foam_brick/textured_simple.obj',
+                   22: f'{models_path}/026_sponge/textured_simple.obj'}
 
 ply_models_path = f'{dataset_path}/ply_models'
 ply_model_paths = {1: f'{ply_models_path}/obj_000001.ply',
@@ -51,7 +56,8 @@ ply_model_paths = {1: f'{ply_models_path}/obj_000001.ply',
                    18: f'{ply_models_path}/obj_000018.ply',
                    19: f'{ply_models_path}/obj_000019.ply',
                    20: f'{ply_models_path}/obj_000020.ply',
-                   21: f'{ply_models_path}/obj_000021.ply'}
+                   21: f'{ply_models_path}/obj_000021.ply',
+                   22: '/home/gdk/Data/kitchen_countertops/models/026_sponge/textured_simple.obj.ply'}
 
 models_info_path = '/media/gdk/Data/Datasets/bop_datasets/ycbv/models_eval/models_info.json'
 
@@ -76,7 +82,8 @@ model_names = [
      'large_marker',
      'large_clamp',
      'extra_large_clamp',
-     'foam_brick'
+     'foam_brick',
+     'sponge'
 ]
 
 
@@ -183,20 +190,20 @@ def compare_gt_est(gt_im, est_im):
 
 
 if __name__ == '__main__':
-    # load gt
-    gt_path = '/home/gdk/data/scene_220603104027/camera_03/scene_gt.json'
-    gt = load_ground_truth(gt_path)
-    dict_id_poses = gt[0]
-    print(dict_id_poses)
-    im_path = '/home/gdk/data/scene_220603104027/camera_03/rgb/000000.png'
-    intrinsics = load_intrinsics('/home/gdk/data/scene_220603104027/camera_03/camera_meta.yml')
-    py_renderer = create_scene(intrinsics, dict_id_poses.keys())
-    py_rendered_im = render_obj_pose(py_renderer, dict_id_poses, unit='mm')
-    py_rendered_im = overlay_imgs(cv2.imread(im_path), py_rendered_im)
-    cv2.imshow('gt', py_rendered_im)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    exit()
+    # # load gt
+    # gt_path = '/home/gdk/data/scene_220603104027/camera_03/scene_gt.json'
+    # gt = load_ground_truth(gt_path)
+    # dict_id_poses = gt[0]
+    # print(dict_id_poses)
+    # im_path = '/home/gdk/data/scene_220603104027/camera_03/rgb/000000.png'
+    # intrinsics = load_intrinsics('/home/gdk/data/scene_220603104027/camera_03/camera_meta.yml')
+    # py_renderer = create_scene(intrinsics, dict_id_poses.keys())
+    # py_rendered_im = render_obj_pose(py_renderer, dict_id_poses, unit='mm')
+    # py_rendered_im = overlay_imgs(cv2.imread(im_path), py_rendered_im)
+    # cv2.imshow('gt', py_rendered_im)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    # exit()
 
     # test comp gt and est
     # gt_im = cv2.imread('gt_screenshot_01.10.2022.png')
@@ -206,7 +213,7 @@ if __name__ == '__main__':
 
 
     # Test render objs
-    test_path = '/media/gdk/Data/Datasets/old_kitchen_data/multiple_depth_cameras/1652915948/752112070756'
+    test_path = '/media/gdk/Hard Disk/Datasets/old_kitchen_data/multiple_depth_cameras/1652915948/752112070756'
     test_img_name = '000036_color.png'
     dict_id_poses = {3: [np.array([[0.50324144, 0.86231973, -0.05614924, -0.00303771],
                                    [0.78285323, -0.48244995, -0.39291584, -0.0212927],
@@ -217,7 +224,9 @@ if __name__ == '__main__':
 
     # render objs with pyrender
     py_renderer = create_scene(intrinsics, dict_id_poses.keys())
+    t = time.time()
     py_rendered_im = render_obj_pose(py_renderer, dict_id_poses)
+    print(time.time() - t)
     py_rendered_im = overlay_imgs(test_im, py_rendered_im)
 
     # render objs with vispy
@@ -225,13 +234,17 @@ if __name__ == '__main__':
     fx, fy, cx, cy = intrinsics[0, 0], intrinsics[1, 1], intrinsics[0, 2], intrinsics[1, 2]
 
     vi_renderer = renderer.create_renderer(w, h, renderer_type='vispy', mode='rgb')
+
     for obj_id in dict_id_poses.keys():
         vi_renderer.add_object(obj_id, ply_model_paths[obj_id])
 
     vi_rendered_im = np.zeros_like(test_im)
     for obj_id, poses in dict_id_poses.items():
         for pose in poses:
+            t = time.time()
             out_im = vi_renderer.render_object(obj_id, pose[:3, :3], pose[:3, 3] * 1000, fx, fy, cx, cy)['rgb']
+            print(time.time() - t)
+
             out_im = out_im[:, :, ::-1]
             vi_rendered_im = overlay_imgs(vi_rendered_im, out_im, 1, 1)
     vi_rendered_im = overlay_imgs(test_im, vi_rendered_im)
@@ -246,7 +259,7 @@ if __name__ == '__main__':
 
     # -----------------
     # test pts render
-    test_path = '/media/gdk/Data/Datasets/old_kitchen_data/multiple_depth_cameras/1652915948/752112070756'
+    test_path = '/media/gdk/Hard Disk/Datasets/old_kitchen_data/multiple_depth_cameras/1652915948/752112070756'
     test_img_name = '000036_color.png'
     xyzs = [[-0.00303771, -0.0212927, 1.0443474]]
 

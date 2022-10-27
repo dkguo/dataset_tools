@@ -79,8 +79,7 @@ def load_intrinsics(camera_meta_path):
 
 def load_extrinsics(extrinsics_path):
     with open(extrinsics_path, 'r') as file:
-        y = yaml.full_load(file)
-    ext = y['extrinsics']
+        ext = yaml.full_load(file)
     for k, e in ext.items():
         ext[k] = np.array(e)
     return ext

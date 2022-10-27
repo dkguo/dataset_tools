@@ -11,9 +11,9 @@ import vispy
 from vispy import app, gloo
 import OpenGL.GL as gl
 
-from bop_toolkit_lib import inout
-from bop_toolkit_lib import misc
-from bop_toolkit_lib import renderer
+from bop_toolkit.bop_toolkit_lib import inout
+from bop_toolkit.bop_toolkit_lib import misc
+from bop_toolkit.bop_toolkit_lib import renderer
 
 # app backends: glfw, pyglet, egl
 # gl backends: gl2, pyopengl2, gl+
