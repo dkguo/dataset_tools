@@ -1,3 +1,5 @@
+import os
+
 import cv2
 import numpy as np
 
@@ -64,3 +66,66 @@ def add_texts(img, text_list, start_xy=(30, 30), thickness=2, font=cv2.FONT_HERS
     for i, (text, color) in enumerate(text_list):
         img = cv2.putText(img, text, (x, y + i * 30), font, 1, color, thickness=thickness)
     return img
+
+
+def add_green_texts(img, text_list, start_xy=(30, 30), thickness=2, font_scale=1, font=cv2.FONT_HERSHEY_SIMPLEX):
+    """
+    text_list: [(text, color)], color=(0, 255, 0)
+    """
+    x, y = start_xy
+    for i, text in enumerate(text_list):
+        img = cv2.putText(img, text, (x, y + i * 30), font, font_scale, (0, 255, 0), thickness=thickness)
+    return img
+
+
+def add_text_video(dict_frame_text, video_path, save_path, frame_rate=None,
+                   start_xy=(50, 100), thickness=10, font_scale=2):
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print('video is not open')
+
+    frame_rate = int(cap.get(cv2.CAP_PROP_FPS) if frame_rate is None else frame_rate)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    print(f'Add text to {video_path}')
+    print(f'Saving at {save_path}')
+    print(f'{frame_rate} fps, dim: {width}, {height}')
+
+    if save_path == video_path:
+        print(f'{video_path[:-4]}_tmp.mp4')
+        out_video = cv2.VideoWriter(f'{video_path[:-4]}_tmp.mp4', cv2.VideoWriter_fourcc(*'mp4v'),
+                                    frame_rate, (width, height))
+    else:
+        out_video = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), frame_rate, (width, height))
+
+    i = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+
+        if not ret:
+            break
+
+        if i in dict_frame_text:
+            frame = add_green_texts(frame, dict_frame_text[i], start_xy=start_xy, thickness=thickness, font_scale=font_scale)
+
+        out_video.write(frame)
+        cv2.imshow('f', frame)
+        cv2.waitKey(1)
+        i += 1
+
+    out_video.release()
+
+    if save_path == video_path:
+        os.rename(f'{video_path[:-4]}_tmp.mp4', video_path)
+
+
+def add_frame_num_to_video(video_path):
+    cap = cv2.VideoCapture(video_path)
+    num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+
+    dict_frame_text = {}
+    for i in range(num_frames):
+        dict_frame_text[i] = [f'Frame {i}']
+
+    add_text_video(dict_frame_text, video_path, video_path, thickness=6)

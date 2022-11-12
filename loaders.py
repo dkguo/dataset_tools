@@ -134,9 +134,9 @@ def load_bop_est_pose(bop_results_path, scene_id, image_id):
 
 
 if __name__ == '__main__':
-    scene_path = '/home/gdk/data/1654267227_formated'
-    camera_seq = get_camera_names(scene_path)
-    print(camera_seq)
+    # scene_path = '/home/gdk/data/1654267227_formated'
+    # camera_seq = get_camera_names(scene_path)
+    # print(camera_seq)
 
     # frame_number = frame_number(scene_path)
     # print(frame_number)
@@ -147,3 +147,7 @@ if __name__ == '__main__':
     # test load extrinsics
     # ext_path = '/home/gdk/data/scene_220603104027/extrinsics.yml'
     # load_extrinsics(ext_path)
+
+    imgs_path = '/home/gdk/Repositories/VISOR-HOS/outputs/hos_postprocess'
+    imgs = load_images(imgs_path, 'jpg')
+    save_mp4(imgs, imgs_path + '/video.mp4', 30)

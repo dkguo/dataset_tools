@@ -14,6 +14,7 @@ import time
 # os.environ['PYOPENGL_PLATFORM'] = 'egl'
 
 import argparse
+from multiprocessing import Pool
 
 import numpy as np
 import open3d as o3d
@@ -253,6 +254,10 @@ class AppWindow:
         # self._scene_control.add_child(refine_position)
         self._scene_control.add_child(generate_save_annotation)
 
+        fill_annotation = gui.Button("Fill previous empty annotation")
+        fill_annotation.set_on_clicked(self._on_fill_annotation_from_last_avaiable_frame)
+        self._scene_control.add_child(fill_annotation)
+
         # ---- Menu ----
         if gui.Application.instance.menubar is None:
             file_menu = gui.Menu()
@@ -486,6 +491,7 @@ class AppWindow:
                 json.dump(gt_6d_pose_data, gt_scene)
 
         self._annotation_changed = False
+        print('annoation saved')
 
     def _on_error(self, err_msg):
         dlg = gui.Dialog("Error")
@@ -693,7 +699,6 @@ class AppWindow:
                 print(f'No gt in image {image_num}')
                 return
             scene_data = data[str(image_num)]
-            # active_meshes = list()
             for obj in scene_data:
                 # add object to annotation_scene object
                 obj_geometry = o3d.io.read_point_cloud(ply_model_paths[int(obj['obj_id'])])
@@ -726,6 +731,7 @@ class AppWindow:
 
     def _update_rgb_views(self):
         print('updating rgb views...')
+        tt = time.time()
         obj_ext_poses = {}
         objs = self._annotation_scene.get_objects()
         for obj in objs:
@@ -797,6 +803,7 @@ class AppWindow:
         self._load_annotation(self._annotation_scene.image_num - 1)
         self._update_rgb_views()
         self._annotation_changed = True
+        self._meshes_used.selected_index = 0
 
     def _on_load_next_annotation(self):
         if self._annotation_scene.image_num + 1 >= len(
@@ -807,15 +814,40 @@ class AppWindow:
         self._load_annotation(self._annotation_scene.image_num + 1)
         self._update_rgb_views()
         self._annotation_changed = True
+        self._meshes_used.selected_index = 0
 
     def _on_fill_annotation_from_last_avaiable_frame(self):
-        return
+        scene_gt_path = os.path.join(self.scene_path, f'{self.camera_names[0]}', 'scene_gt.json')
+        if not os.path.exists(scene_gt_path):
+            print('no scene_gt.json')
+            return
+
+        with open(scene_gt_path) as scene_gt_file:
+            data = json.load(scene_gt_file)
+
+        max_im_num = max([int(k) for k in data.keys() if int(k) < self._annotation_scene.image_num])
+        print('copying annoation from frame', max_im_num, 'until frame', self._annotation_scene.image_num)
+
+        for camera_name in self.camera_names:
+            scene_gt_path = os.path.join(self.scene_path, camera_name, 'scene_gt.json')
+            with open(scene_gt_path) as scene_gt_file:
+                data = json.load(scene_gt_file)
+
+            for i in range(max_im_num + 1, self._annotation_scene.image_num + 1):
+                data[str(i)] = data[str(max_im_num)]
+
+            with open(scene_gt_path, 'w') as scene_gt_file:
+                json.dump(data, scene_gt_file)
+
+        self._load_annotation(self._annotation_scene.image_num)
+        self._update_rgb_views()
 
 
 def main():
     parser = argparse.ArgumentParser(description='Annotation tool.')
     parser.add_argument('--scene_name', default='scene_2210232307_01')
-    parser.add_argument('--start_frame', type=int, default=100)
+    # parser.add_argument('--scene_name', default='scene_2210232348_wzq')
+    parser.add_argument('--start_frame', type=int, default=366)
 
     args = parser.parse_args()
     scene_name = args.scene_name
