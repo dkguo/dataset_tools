@@ -7,9 +7,9 @@ import numpy as np
 import pyrender
 import trimesh
 
-from bop_toolkit.bop_toolkit_lib import renderer
-from config import dataset_path
-from loaders import load_intrinsics, load_ground_truth
+from dataset_tools.bop_toolkit.bop_toolkit_lib import renderer
+from dataset_tools.config import dataset_path
+from dataset_tools.loaders import load_intrinsics, load_ground_truth
 
 models_path = f'{dataset_path}/models'
 obj_model_paths = {1: f'{models_path}/002_master_chef_can/textured_simple.obj',
