@@ -3,30 +3,29 @@ import yaml
 import numpy as np
 
 from dataset_tools.config import dataset_path
-from dataset_tools.loaders import get_camera_names, load_intrinsics
+from dataset_tools.loaders import get_camera_names, load_intrinsics, load_extrinsics, intr2param
 from dataset_tools.process.apriltag_detection import detect_april_tag, draw_pose, draw_pose_axes, annotate_detection
 from dataset_tools.process.helpers import add_texts, add_border, collage_imgs
 
 apriltag_detect_error_thres = 0.07
 
 
-def process_extrinsics(camera_names_image_params, tag_size, save_path=None):
+def process_extrinsics(cameras_image_intric, tag_size, save_path=None):
     """
-
     Args:
-        camera_names_image_params: dict[camera_name] = (image, params), camera_01_* is used as master
+        cameras_image_intric: dict[camera_name] = (image, params), camera_01_* is used as master
         tag_size
 
     Returns:
         camera_extrinsics: dict[camera] = extrinsics
         preview_img
     """
-    camera_names = sorted(camera_names_image_params.keys())
+    camera_names = sorted(cameras_image_intric.keys())
 
     correspondences = []
     overlays = []
     for camera_id, camera_name in enumerate(camera_names):
-        image, camera_params = camera_names_image_params[camera_name]
+        image, camera_params = cameras_image_intric[camera_name]
 
         poses_errs, overlay = detect_april_tag(image, camera_params, tag_size)
 
@@ -78,9 +77,34 @@ def process_extrinsics(camera_names_image_params, tag_size, save_path=None):
     return return_dict, preview_img
 
 
+def verify_calibration(cameras_img, cameras_intr, cameras_ext, tag_size=0.08):
+    # register all tags
+    tags = {}
+    for camera_name, image in cameras_img.items():
+        camera_params = intr2param(cameras_intr[camera_name])
+        poses_errs, overlay = detect_april_tag(image, camera_params, tag_size)
+
+        for tag_id, pose, error in poses_errs:
+            if error < apriltag_detect_error_thres and tag_id not in tags:
+                tags[tag_id] = (camera_name, pose)
+
+    # plot all tags
+    for camera_name, image in cameras_img.items():
+        camera_params = intr2param(cameras_intr[camera_name])
+        for tag_camera_name, pose in tags.values():
+            if camera_name == tag_camera_name:
+                draw_pose(image, camera_params, tag_size, pose, color=(0, 0, 255))
+            else:
+                tag_pose = np.linalg.inv(cameras_ext[camera_name]) @ cameras_ext[tag_camera_name] @ pose
+                draw_pose(image, camera_params, tag_size, tag_pose)
+
+    return cameras_img
+
+
 if __name__ == '__main__':
-    scene_name = 'scene_2210232305_ext'
+    scene_name = 'scene_2211191718'
     master_image_id = 0
+    tag_size = 0.08
 
     camera_names = get_camera_names(f'{dataset_path}/{scene_name}')
     camera_names_image_params = {}
@@ -93,7 +117,23 @@ if __name__ == '__main__':
         camera_names_image_params[camera_name] = (im, camera_params)
 
     ext, preview_img = process_extrinsics(camera_names_image_params, tag_size=0.08,
-                                             save_path=f'{dataset_path}/{scene_name}/extrinsics.yml')
+                                          save_path=f'{dataset_path}/{scene_name}/extrinsics.yml')
     print(ext)
     cv2.imshow('ext', preview_img)
+    cv2.waitKey(0)
+
+    cameras_img = {}
+    cameras_intr = {}
+    cameras_ext = load_extrinsics(f'{dataset_path}/{scene_name}/extrinsics.yml')
+    for i, camera_name in enumerate(camera_names):
+        camera_path = f'{dataset_path}/{scene_name}/{camera_name}'
+        image_path = f'{camera_path}/rgb/{master_image_id:06}.png'
+        im = cv2.imread(image_path)
+        intrinsics = load_intrinsics(f'{camera_path}/camera_meta.yml')
+        cameras_img[camera_name] = im
+        cameras_intr[camera_name] = intrinsics
+
+    cameras_img = verify_calibration(cameras_img, cameras_intr, cameras_ext, tag_size)
+    preview = collage_imgs(list(cameras_img.values()))
+    cv2.imshow('verify', preview)
     cv2.waitKey(0)

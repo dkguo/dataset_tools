@@ -8,6 +8,8 @@ import cv2
 import numpy as np
 import yaml
 
+from dataset_tools.config import dataset_path
+
 
 def get_camera_names(scene_path):
     folders = os.listdir(scene_path)
@@ -77,12 +79,39 @@ def load_intrinsics(camera_meta_path):
     return intrinsics
 
 
+def intr2param(intrinsics):
+    """intrisics: 3x3"""
+    fx, fy, cx, cy = intrinsics[0, 0], intrinsics[1, 1], intrinsics[0, 2], intrinsics[1, 2]
+    return fx, fy, cx, cy
+
+
 def load_extrinsics(extrinsics_path):
     with open(extrinsics_path, 'r') as file:
         ext = yaml.full_load(file)
     for k, e in ext.items():
         ext[k] = np.array(e)
     return ext
+
+
+def load_cameras_meta(scene_name):
+    with open(f'{dataset_path}/{scene_name}/cameras_meta.yml') as f:
+        return yaml.full_load(f)
+
+
+def load_cameras_intrisics(scene_name):
+    cameras_meta = load_cameras_meta(scene_name)
+    cameras_intics = cameras_meta['INTRINSICS']
+    for camera_name, intri in cameras_intics.items():
+        cameras_intics[camera_name] = np.array(intri)
+    return cameras_intics
+
+
+def load_cameras_extrinsics(scene_name):
+    cameras_meta = load_cameras_meta(scene_name)
+    cameras_exts = cameras_meta['EXTRINSICS']
+    for camera_name, ext in cameras_exts.items():
+        cameras_exts[camera_name] = np.array(ext)
+    return cameras_exts
 
 
 def get_depth_scale(camera_meta_path, convert2unit='mm'):
@@ -148,6 +177,10 @@ if __name__ == '__main__':
     # ext_path = '/home/gdk/data/scene_220603104027/extrinsics.yml'
     # load_extrinsics(ext_path)
 
-    imgs_path = '/home/gdk/Repositories/VISOR-HOS/outputs/hos_postprocess'
-    imgs = load_images(imgs_path, 'jpg')
-    save_mp4(imgs, imgs_path + '/video.mp4', 30)
+    # imgs_path = '/home/gdk/Repositories/VISOR-HOS/outputs/hos_postprocess'
+    # imgs = load_images(imgs_path, 'jpg')
+    # save_mp4(imgs, imgs_path + '/video.mp4', 30)
+
+    scene_name = 'scene_2211191439_ext'
+    cameras_intics = load_cameras_intrisics(scene_name)
+    print(cameras_intics)

@@ -12,7 +12,7 @@ from dataset_tools.process.calculate_extrinsics import process_extrinsics
 from dataset_tools.process.helpers import collage_imgs
 
 # settings
-frame_rate = 60  # fps
+frame_rate = 6  # fps
 april_tag_size = 0.08
 scene_name = 'scene_' + datetime.now().strftime("%y%m%d%H%M")
 
@@ -93,7 +93,7 @@ if __name__ == '__main__':
 
         if save_extrinsics:
             ext, preview_img = process_extrinsics(camera_names_image_params, april_tag_size,
-                                         save_path=f'{dataset_path}/{scene_name}/extrinsics.yml')
+                                                  save_path=f'{dataset_path}/{scene_name}/extrinsics.yml')
         else:
             preview_img = collage_imgs(color_images + depth_images)
 

@@ -43,7 +43,6 @@ def unzip_bag(bag_path):
     intrinsics = frameset.get_profile().as_video_stream_profile().get_intrinsics()
     fx, fy, px, py = intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy
     with open(f'{camera_path}/camera_meta.yml', 'w') as file:
-        assert True
         save_str = {'INTRINSICS': [fx, 0.0, px, 0.0, fy, py, 0.0, 0.0, 1.0],
                     'DEPTH_UNIT': 'mm',
                     'FRAME_WIDTH': resolution_width,
@@ -98,5 +97,5 @@ def unzip_bags(scene_name):
 
 
 if __name__ == '__main__':
-    scene_name = 'scene_2211182340'
+    scene_name = 'scene_2211191718'
     unzip_bags(scene_name)

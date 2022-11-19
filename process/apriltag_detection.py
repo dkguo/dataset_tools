@@ -5,7 +5,7 @@ import apriltag
 import collections
 
 
-def draw_pose(overlay, camera_params, tag_size, pose, z_sign=1):
+def draw_pose(overlay, camera_params, tag_size, pose, z_sign=1, color=(0, 255, 0)):
 
     opoints = np.array([
         -1, -1, 0,
@@ -49,7 +49,7 @@ def draw_pose(overlay, camera_params, tag_size, pose, z_sign=1):
     ipoints = [tuple(pt) for pt in ipoints.reshape(-1, 2)]
 
     for i, j in edges:
-        cv2.line(overlay, ipoints[i], ipoints[j], (0, 255, 0), 1, 16)
+        cv2.line(overlay, ipoints[i], ipoints[j], color, 1, 16)
 
 
 def draw_pose_axes(overlay, camera_params, tag_size, pose, center):
