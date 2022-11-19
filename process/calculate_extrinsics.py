@@ -2,10 +2,10 @@ import cv2
 import yaml
 import numpy as np
 
-from config import dataset_path
-from loaders import get_camera_names, load_intrinsics
-from process.apriltag_detection import detect_april_tag, draw_pose, draw_pose_axes, annotate_detection
-from process.helpers import add_texts, add_border, collage_imgs
+from dataset_tools.config import dataset_path
+from dataset_tools.loaders import get_camera_names, load_intrinsics
+from dataset_tools.process.apriltag_detection import detect_april_tag, draw_pose, draw_pose_axes, annotate_detection
+from dataset_tools.process.helpers import add_texts, add_border, collage_imgs
 
 apriltag_detect_error_thres = 0.07
 
@@ -79,7 +79,7 @@ def process_extrinsics(camera_names_image_params, tag_size, save_path=None):
 
 
 if __name__ == '__main__':
-    scene_name = 'scene_2210232343_ext'
+    scene_name = 'scene_2210232305_ext'
     master_image_id = 0
 
     camera_names = get_camera_names(f'{dataset_path}/{scene_name}')

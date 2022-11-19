@@ -7,13 +7,12 @@ import cv2
 import numpy as np
 import pyrealsense2 as rs
 
-from config import dataset_path, resolution_width, resolution_height
-from process.calculate_extrinsics import process_extrinsics
-from process.helpers import collage_imgs
-from process.unzip_bags import unzip_bags
+from dataset_tools.config import dataset_path, resolution_width, resolution_height
+from dataset_tools.process.calculate_extrinsics import process_extrinsics
+from dataset_tools.process.helpers import collage_imgs
 
 # settings
-frame_rate = 30  # fps
+frame_rate = 60  # fps
 april_tag_size = 0.08
 scene_name = 'scene_' + datetime.now().strftime("%y%m%d%H%M")
 
