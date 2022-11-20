@@ -8,12 +8,10 @@ import numpy as np
 import pyrealsense2 as rs
 
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
-from dataset_tools.process.calculate_extrinsics import process_extrinsics
 from dataset_tools.process.helpers import collage_imgs
 
 # settings
-frame_rate = 6  # fps
-april_tag_size = 0.08
+frame_rate = 60  # fps
 scene_name = 'scene_' + datetime.now().strftime("%y%m%d%H%M")
 
 
@@ -62,7 +60,6 @@ if __name__ == '__main__':
     print(f'{len(devices)} devices are enabled')
 
     # preview
-    save_extrinsics = False
     while True:
         camera_names_image_params = {}
         color_images = []
@@ -83,20 +80,8 @@ if __name__ == '__main__':
                         depth_image = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.3),
                                                         cv2.COLORMAP_JET)
                         depth_images.append(depth_image)
-            else:
-                continue
 
-            if save_extrinsics:
-                intrinsics = frameset.get_profile().as_video_stream_profile().get_intrinsics()
-                fx, fy, px, py = intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy
-                camera_names_image_params[device_name] = (color_image, (fx, fy, px, py))
-
-        if save_extrinsics:
-            ext, preview_img = process_extrinsics(camera_names_image_params, april_tag_size,
-                                                  save_path=f'{dataset_path}/{scene_name}/extrinsics.yml')
-        else:
-            preview_img = collage_imgs(color_images + depth_images)
-
+        preview_img = collage_imgs(color_images + depth_images)
         cv2.namedWindow('Preview', cv2.WINDOW_AUTOSIZE)
         cv2.imshow('Preview', preview_img)
 
@@ -104,8 +89,6 @@ if __name__ == '__main__':
         if key & 0xFF == ord('q') or key == 27:
             cv2.destroyAllWindows()
             break
-        if key & 0xFF == ord('e'):
-            save_extrinsics = not save_extrinsics
 
     # Start recording
     for device_name, device in devices.items():
@@ -119,7 +102,11 @@ if __name__ == '__main__':
             print(f'frame rate: {30 / (cur_time - prev_time)} fps')
             prev_time = cur_time
 
+        p_time = time.time()
         for device in devices.values():
             device.pipeline.wait_for_frames()
+            print(time.time() - p_time)
+
+        print('')
 
         i += 1
