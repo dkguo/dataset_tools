@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import pyrealsense2 as rs
 
-from dataset_tools.config import dataset_path, resolution_width, resolution_height
+from dataset_tools.dataset_config import dataset_path, resolution_width, resolution_height
 from dataset_tools.process.helpers import collage_imgs
 
 # settings

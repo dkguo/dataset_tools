@@ -7,8 +7,10 @@ import re
 import cv2
 import numpy as np
 import yaml
+import scipy.io
 
-from dataset_tools.config import dataset_path
+
+from dataset_tools.dataset_config import dataset_path
 
 
 def get_camera_names(scene_path):
@@ -88,6 +90,8 @@ def intr2param(intrinsics):
 def load_extrinsics(extrinsics_path):
     with open(extrinsics_path, 'r') as file:
         ext = yaml.full_load(file)
+    if 'EXTRINSICS' in ext:
+        ext = ext['EXTRINSICS']
     for k, e in ext.items():
         ext[k] = np.array(e)
     return ext

@@ -11,7 +11,7 @@ import cv2
 import yaml
 
 from dataset_tools.bop_toolkit.bop_toolkit_lib.inout import save_im, save_depth
-from dataset_tools.config import dataset_path, resolution_width, resolution_height
+from dataset_tools.dataset_config import dataset_path, resolution_width, resolution_height
 
 
 def unzip_bag(bag_path):
@@ -97,5 +97,5 @@ def unzip_bags(scene_name):
 
 
 if __name__ == '__main__':
-    scene_name = 'scene_2211191718'
+    scene_name = 'scene_2211192313'
     unzip_bags(scene_name)

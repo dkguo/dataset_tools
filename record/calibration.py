@@ -10,9 +10,8 @@ import pyrealsense2 as rs
 import yaml
 from simple_parsing import ArgumentParser
 
-from dataset_tools.config import dataset_path, resolution_width, resolution_height
+from dataset_tools.dataset_config import dataset_path, resolution_width, resolution_height
 from dataset_tools.loaders import load_cameras_intrisics, load_cameras_extrinsics
-from dataset_tools.process.calculate_extrinsics import verify_calibration
 from dataset_tools.process.helpers import collage_imgs, add_border
 from dataset_tools.record.multical.multical.app.calibrate import Calibrate
 
@@ -204,4 +203,5 @@ if __name__ == '__main__':
     # scene_path = f'{dataset_path}/{scene_name}'
     # generate_cameras_meta(scene_path)
 
-    main()
+    # main()
+    calibration('/home/gdk/Data/kitchen_sink/scene_2211192303_ext')
