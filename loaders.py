@@ -166,6 +166,41 @@ def load_bop_est_pose(bop_results_path, scene_id, image_id):
     return est_dict_id_poses
 
 
+def load_object_poses(file_path):
+    """
+    This function loads object poses assuming there is only one identical object in each frame.
+    :param file_path: the file has dict[frame][object_id] = pose
+
+    :return: object_poses: dict[object_id] = pose
+    """
+    with open(file_path) as f:
+        frame_object_poses = json.load(f)
+
+    # find obj keys
+    obj_ids = set()
+    for object_poses in frame_object_poses.values():
+        for obj_id in object_poses.keys():
+            obj_ids.add(obj_id)
+
+    object_poses = {}
+    for obj_id in obj_ids:
+        poses = []
+        last_frame = int(list(frame_object_poses.keys())[-1])
+        for frame in range(last_frame + 1):
+            if str(frame) in frame_object_poses:
+                if obj_id in frame_object_poses[str(frame)]:
+                    pose = np.array(frame_object_poses[str(frame)][obj_id])
+                    assert pose.shape == (4, 4)
+                    poses.append(np.array(frame_object_poses[str(frame)][obj_id]))
+                else:
+                    poses.append(None)
+            else:
+                poses.append(None)
+        object_poses[obj_id] = poses
+
+    return object_poses
+
+
 if __name__ == '__main__':
     # scene_path = '/home/gdk/data/1654267227_formated'
     # camera_seq = get_camera_names(scene_path)

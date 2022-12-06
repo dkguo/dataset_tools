@@ -8,7 +8,7 @@ import numpy as np
 import pyrealsense2 as rs
 
 from dataset_tools.dataset_config import dataset_path, resolution_width, resolution_height
-from dataset_tools.process.helpers import collage_imgs
+from dataset_tools.view.helpers import collage_imgs
 
 # settings
 frame_rate = 60  # fps

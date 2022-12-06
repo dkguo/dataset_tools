@@ -1,7 +1,6 @@
 import json
 import os
 import shutil
-import time
 from datetime import datetime
 
 import cv2
@@ -12,10 +11,12 @@ from simple_parsing import ArgumentParser
 
 from dataset_tools.dataset_config import dataset_path, resolution_width, resolution_height
 from dataset_tools.loaders import load_cameras_intrisics, load_cameras_extrinsics
-from dataset_tools.process.helpers import collage_imgs, add_border
+from dataset_tools.view.helpers import collage_imgs, add_border
 from dataset_tools.record.multical.multical.app.calibrate import Calibrate
 
 # settings
+from dataset_tools.record.apriltag_detection import verify_calibration
+
 frame_rate = 6  # fps
 num_frame_for_each_angle = 50
 vis_calibration = True

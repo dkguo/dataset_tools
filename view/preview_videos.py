@@ -7,8 +7,8 @@ from moviepy.editor import *
 from tqdm import tqdm
 
 from dataset_tools.dataset_config import dataset_path
-from dataset_tools.loaders import get_camera_names, load_images, save_mp4
-from dataset_tools.process.helpers import add_frame_num_to_video
+from dataset_tools.loaders import get_camera_names
+from dataset_tools.view.helpers import add_frame_num_to_video
 
 
 def png2video(camera_path, frame_rate=30):

@@ -2,6 +2,7 @@ import os
 
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def collage_imgs(ims, num_rows=2):
@@ -129,3 +130,32 @@ def add_frame_num_to_video(video_path):
         dict_frame_text[i] = [f'Frame {i}']
 
     add_text_video(dict_frame_text, video_path, video_path, thickness=6)
+
+
+def plot_poses(poses):
+    coods = []
+    for pose in poses:
+        if pose is not None:
+            p_object = pose[:3, 3]
+            R = pose[:3, :3]
+            p_x = R @ [0.01, 0, 0]
+            p_y = R @ [0, 0.01, 0]
+            p_z = R @ [0, 0, 0.01]
+            cood = np.r_[[np.r_[p_object, p_x],
+                          np.r_[p_object, p_y],
+                          np.r_[p_object, p_z]]]
+            coods.append(cood)
+
+    coods = np.array(coods)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    for i, c in zip(range(3), ['b', 'r', 'g']):
+        s = coods[:, i, :].reshape((-1, 6))
+        X, Y, Z, U, V, W = zip(*s)
+        ax.quiver(X, Y, Z, U, V, W, color=c)
+    plt.show()
+
+
+if __name__ == '__main__':
+    add_frame_num_to_video('/Users/gdk/Downloads/video.mp4')

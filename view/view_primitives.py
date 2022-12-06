@@ -5,6 +5,7 @@ import cv2
 from config import dataset_path
 from process.helpers import add_texts, add_green_texts
 
+
 if __name__ == '__main__':
     scene_name = 'scene_2210232307_01'
     # load primitive csv
