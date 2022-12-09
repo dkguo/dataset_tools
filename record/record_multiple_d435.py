@@ -7,11 +7,11 @@ import cv2
 import numpy as np
 import pyrealsense2 as rs
 
-from dataset_tools.dataset_config import dataset_path, resolution_width, resolution_height
+from dataset_tools.config import dataset_path, resolution_width, resolution_height
 from dataset_tools.view.helpers import collage_imgs
 
 # settings
-frame_rate = 60  # fps
+frame_rate = 30  # fps
 scene_name = 'scene_' + datetime.now().strftime("%y%m%d%H%M")
 
 
@@ -105,8 +105,8 @@ if __name__ == '__main__':
         p_time = time.time()
         for device in devices.values():
             device.pipeline.wait_for_frames()
-            print(time.time() - p_time)
-
-        print('')
+        #     print(time.time() - p_time)
+        #
+        # print('')
 
         i += 1

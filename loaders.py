@@ -10,7 +10,7 @@ import yaml
 import scipy.io
 
 
-from dataset_tools.dataset_config import dataset_path
+from dataset_tools.config import dataset_path
 
 
 def get_camera_names(scene_path):
@@ -199,6 +199,28 @@ def load_object_poses(file_path):
         object_poses[obj_id] = poses
 
     return object_poses
+
+
+def save_obj_poses(obj_poses, save_path):
+    """
+    Args:
+        obj_poses: dict[obj_id] = poses, poses could be a list or numpy array
+        save_path:
+    """
+    assert save_path[-5:] == '.json', 'must save to a file ends with .json'
+    save_dir = os.path.dirname(save_path)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    save_dict = {}
+    for obj_id, poses in obj_poses.items():
+        if type(poses).__module__ == np.__name__:
+            save_dict[obj_id] = poses.tolist()
+        elif type(poses[0]).__module__ == np.__name__:
+            save_dict[obj_id] = [pose.tolist() for pose in poses]
+
+    with open(save_path, 'w') as f:
+        json.dump(save_dict, f, indent=4)
 
 
 if __name__ == '__main__':

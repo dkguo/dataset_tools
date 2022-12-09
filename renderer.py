@@ -8,7 +8,7 @@ import pyrender
 import trimesh
 
 from dataset_tools.bop_toolkit.bop_toolkit_lib import renderer
-from dataset_tools.dataset_config import dataset_path
+from dataset_tools.config import dataset_path
 from dataset_tools.loaders import load_intrinsics, load_ground_truth
 
 models_path = f'{dataset_path}/models'
