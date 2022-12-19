@@ -51,7 +51,7 @@ def calibration(scene_path=scene_path):
     program.app.paths.limit_images = 2000
     program.app.vis = vis_calibration
     program.app.optimizer.fix_intrinsic = True
-    program.app.camera.calibration = f'{scene_path}/intrinsics.json'
+    program.app.camera_name.calibration = f'{scene_path}/intrinsics.json'
 
     program.app.execute()
 

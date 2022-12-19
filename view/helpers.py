@@ -132,7 +132,7 @@ def add_frame_num_to_video(video_path):
     add_text_video(dict_frame_text, video_path, video_path, thickness=6)
 
 
-def plot_poses(poses):
+def plot_poses_3d(poses):
     coods = []
     for pose in poses:
         if pose is not None:

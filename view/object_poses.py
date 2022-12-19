@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 
 from dataset_tools.config import dataset_path
-from dataset_tools.loaders import get_camera_names, load_intrinsics, load_extrinsics, frame_number
+from dataset_tools.loaders import get_camera_names, load_intrinsics, load_extrinsics, get_num_frame
 from dataset_tools.renderer import create_scene, render_obj_pose, overlay_imgs
 from dataset_tools.view.preview_videos import combine_videos
 
@@ -26,7 +26,7 @@ def view_obj_poses(scene_name, camera_ids, obj_poses, save_folder_name):
     scene_path = f'{dataset_path}/{scene_name}'
     camera_names = get_camera_names(scene_path)
     extrinsics = load_extrinsics(f'{scene_path}/cameras_meta.yml')
-    num_frames = frame_number(scene_path)
+    num_frames = get_num_frame(scene_path)
 
     frames_combined_obj_T = {}
     for obj_id, poses in obj_poses.items():

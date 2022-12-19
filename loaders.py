@@ -13,7 +13,8 @@ import scipy.io
 from dataset_tools.config import dataset_path
 
 
-def get_camera_names(scene_path):
+def get_camera_names(scene_name):
+    scene_path = f'{dataset_path}/{scene_name}'
     folders = os.listdir(scene_path)
     camera_seq = []
     for folder in folders:
@@ -22,11 +23,12 @@ def get_camera_names(scene_path):
     return sorted(camera_seq)
 
 
-def frame_number(scene_path):
-    camera_seq = get_camera_names(scene_path)
+def get_num_frame(scene_name):
+    scene_path = f'{dataset_path}/{scene_name}'
+    camera_names = get_camera_names(scene_path)
     nums = []
-    for camera in camera_seq:
-        files = glob.glob(f'{scene_path}/{camera}/rgb/*.png')
+    for camera_name in camera_names:
+        files = glob.glob(f'{scene_path}/{camera_name}/rgb/*.png')
         nums.append(len(files))
     return min(nums)
 
@@ -190,7 +192,9 @@ def load_object_poses(file_path):
             if str(frame) in frame_object_poses:
                 if obj_id in frame_object_poses[str(frame)]:
                     pose = np.array(frame_object_poses[str(frame)][obj_id])
-                    assert pose.shape == (4, 4)
+                    if pose.ndim > 2:
+                        pose = pose[0]
+                    assert pose.shape == (4, 4), pose
                     poses.append(np.array(frame_object_poses[str(frame)][obj_id]))
                 else:
                     poses.append(None)
@@ -225,8 +229,8 @@ def save_obj_poses(obj_poses, save_path):
 
 if __name__ == '__main__':
     # scene_path = '/home/gdk/data/1654267227_formated'
-    # camera_seq = get_camera_names(scene_path)
-    # print(camera_seq)
+    # camera_names = get_camera_names(scene_path)
+    # print(camera_names)
 
     # frame_number = frame_number(scene_path)
     # print(frame_number)
