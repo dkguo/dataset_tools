@@ -1,15 +1,20 @@
 import csv
 import json
+from collections import OrderedDict
 
 import cv2
 import imageio
 import numpy as np
+import pandas as pd
+from numpy.lib.recfunctions import append_fields
+from tqdm import tqdm
 
 from dataset_tools.bop_toolkit.bop_toolkit_lib import pose_error, misc, inout, renderer
 from dataset_tools.bop_toolkit.bop_toolkit_lib.inout import load_depth
 from config import ply_model_paths, models_info_path, obj_model_paths, dataset_path, resolution_width, resolution_height
 from loaders import load_ground_truth, load_bop_est_pose, get_camera_names, load_object_poses, load_intrinsics, \
-    get_num_frame
+    get_num_frame, load_gt_opt, save_object_pose_table
+from modules.object_pose.detect_post_processing import load_obj_pose_table
 from renderer import create_scene, render_obj_pose, overlay_imgs, compare_gt_est
 
 
@@ -104,7 +109,7 @@ def score_single_error(errors):
     return average_recall, scores
 
 
-def single_image_score():
+def score_single_image():
     scene_id = 48
     image_id = 1074
     ren_obj_id = 1
@@ -177,107 +182,114 @@ def single_image_score():
                 print(f"AR: {ar}, Scores: {score}")
 
 
-def scene_score(scene_name: str, est_pose_file_paths: list, save_path, valid_objids=[12, 13]):
+def score_scene(scene_name, est_pose_file_paths, render=False):
     """
     Calculate AR for the scene.
     files in est_pose_file_paths corresponds to camera_ids
+    AR are stored in average_recall column of est_pose_file_paths
     """
     scene_path = f"{dataset_path}/{scene_name}"
     camera_names = get_camera_names(scene_path)
 
-    # find all obj_ids in scene
+    # find all obj_ids in scene_gt
     gt_path = f"{scene_path}/{camera_names[0]}/scene_gt.json"
-    gt_dict_frame_objid_poses = load_ground_truth(gt_path)
-    obj_ids = set()
-    for objid_poses in gt_dict_frame_objid_poses.values():
-        obj_ids.update(list(objid_poses.keys()))
+    gt_opt = load_gt_opt(gt_path)
+    obj_ids = set(gt_opt['obj_id'])
     print('obj_ids in ground truth:', obj_ids)
 
     # load models_info and renderer
     models_info = inout.load_json(models_info_path, keys_to_int=True)
     ren = renderer.create_renderer(resolution_width, resolution_height, 'vispy', mode='depth')
     for obj_id in obj_ids:
-        if obj_id not in valid_objids:
-            continue
-        models_info[obj_id]['symmetry'] = misc.get_symmetry_transformations(models_info[obj_id], max_sym_disc_step=0.01)
-        models_info[obj_id]['pts'] = inout.load_ply(ply_model_paths[obj_id])['pts']
-        ren.add_object(obj_id, ply_model_paths[obj_id])
+        if obj_id in models_info:
+            models_info[obj_id]['symmetry'] = misc.get_symmetry_transformations(models_info[obj_id], max_sym_disc_step=0.01)
+            models_info[obj_id]['pts'] = inout.load_ply(ply_model_paths[obj_id])['pts']
+            ren.add_object(obj_id, ply_model_paths[obj_id])
 
-    arr_cameraid_frame_objid_AR = []
-    for i, est_file_path in enumerate(est_pose_file_paths):
-        camera_path = f"{scene_path}/{camera_names[i]}"
+    # loop through cameras
+    for camera_i, est_file_path in enumerate(est_pose_file_paths):
+        print(camera_names[camera_i])
+        camera_path = f"{scene_path}/{camera_names[camera_i]}"
 
-        # load ground truth
-        gt_path = f"{camera_path}/scene_gt.json"
-        gt_dict_frame_objid_poses = load_ground_truth(gt_path)
+        gt_opt = load_gt_opt(f"{camera_path}/scene_gt.json")
+        est_opt = load_obj_pose_table(est_file_path)
+        intric = load_intrinsics(f"{camera_path}/camera_meta.yml")
 
-        # load est poses
-        dict_obj_poses = load_object_poses(est_file_path)
+        if 'average_recall' not in est_opt.dtype.names:
+            est_opt = append_fields(est_opt, 'average_recall', np.zeros(est_opt.shape[0]), dtypes='f', usemask=False)
 
-        # load intric
-        intric_path = f"{camera_path}/camera_meta.yml"
-        intric = load_intrinsics(intric_path)
+        # Loop through gt pose
+        for frame, obj_id, p_gt in tqdm(gt_opt[['frame', 'obj_id', 'pose']]):
+            if not np.logical_and(est_opt['frame'] == frame, est_opt['obj_id'] == obj_id).any():
+                # pose is not predicted, add a dummy pose
+                est_opt = np.append(est_opt, [est_opt[-1]])
+                est_opt[['frame', 'obj_id', 'pose', 'average_recall']][-1] = (frame, obj_id, np.zeros(1), 0)
+            else:
+                # loop through est_pose matching frame and obj_id
+                depth_im = load_depth(f'{camera_path}/depth/{frame:06d}.png')
+                mask = np.logical_and(est_opt['frame'] == frame, est_opt['obj_id'] == obj_id)
+                for k in mask.nonzero()[0]:
+                    p_est = est_opt['pose'][k]
 
-        # Loop through images
-        for frame in range(get_num_frame(scene_path)):
-            depth_im = load_depth(f'{camera_path}/depth/{frame:06d}.png')
-            if frame not in gt_dict_frame_objid_poses:
-                continue
-            gt_objid_poses = gt_dict_frame_objid_poses[frame]
+                    # dummy pose
+                    if len(p_est) != 4:
+                        continue
 
-            for obj_id in gt_objid_poses.keys():
-                if obj_id not in valid_objids:
-                    continue
-                if str(obj_id) not in dict_obj_poses:
-                    arr_cameraid_frame_objid_AR.append([i, frame, int(obj_id), 0])
-                else:
-                    if dict_obj_poses[str(obj_id)][frame] is None:
-                        arr_cameraid_frame_objid_AR.append([i, frame, int(obj_id), 0])
-                    else:
-                        p_est = dict_obj_poses[str(obj_id)][frame][0]
-                        p_gt = gt_objid_poses[obj_id][0]
-                        p_gt = np.r_[p_gt, [[0, 0, 0, 1]]]
-                        errors = pose_errors(p_est, p_gt, obj_id, models_info, K=intric, depth_im=depth_im, render=ren)
-                        ar, score = score_single_error(errors)
-                        print([i, frame, int(obj_id), ar], errors)
-                        arr_cameraid_frame_objid_AR.append([i, frame, int(obj_id), ar])
+                    # render gt and est pose
+                    if render:
+                        print(f'Frame: {frame}, obj_id: {obj_id}')
+                        py_renderer = create_scene(intric, obj_ids)
 
-                        # render gt and est pose
-                        if render:
-                            py_renderer = create_scene(intric, obj_model_paths.keys())
+                        gt_im = render_obj_pose(py_renderer, list_id_pose=[(obj_id, p_gt)], unit='mm')
+                        # gt_im = overlay_imgs(color_im, gt_im)
+                        cv2.imshow('gt', gt_im)
 
-                            gt_im = render_obj_pose(py_renderer, gt_dict_id_poses, unit='mm')
-                            # gt_im = overlay_imgs(color_im, gt_im)
-                            cv2.imshow('gt', gt_im)
+                        est_im = render_obj_pose(py_renderer, list_id_pose=[(obj_id, p_est)], unit='mm')
+                        # est_im = overlay_imgs(color_im, est_im)
+                        cv2.imshow('est', est_im)
 
-                            est_im = render_obj_pose(py_renderer, est_dict_id_poses, unit='mm')
-                            # est_im = overlay_imgs(color_im, est_im)
-                            cv2.imshow('est', est_im)
+                        # compare gt and est
+                        comp = compare_gt_est(gt_im, est_im)
+                        cv2.imshow('comp', comp)
 
-                            # compare gt and est
-                            comp = compare_gt_est(gt_im, est_im)
-                            cv2.imshow('comp', comp)
+                        cv2.waitKey(0)
+                        cv2.destroyAllWindows()
 
-                            cv2.waitKey(0)
-                            cv2.destroyAllWindows()
+                    errors = pose_errors(p_est, p_gt, obj_id, models_info, K=intric, depth_im=depth_im, render=ren)
+                    ar, score = score_single_error(errors)
+                    if ar > est_opt[k]['average_recall']:
+                        est_opt['average_recall'][k] = ar
 
-    arr_cameraid_frame_objid_AR = np.array(arr_cameraid_frame_objid_AR)
-    arr_cameraid_frame_objid_AR.tofile(save_path, sep=',')
+                    # print(f'Frame: {frame}, obj_id: {obj_id}, AR: {ar}')
+
+        # save
+        save_object_pose_table(est_opt, est_file_path)
 
 
-def print_scores(score_file_path, valid_objids=[12, 13]):
-    arr_cameraid_frame_objid_AR = np.genfromtxt(score_file_path, delimiter=',').reshape((-1, 4))
-    camera_ids = np.unique(arr_cameraid_frame_objid_AR[:, 0])
-    obj_ids = np.unique(arr_cameraid_frame_objid_AR[:, 2])
-
-    for c in camera_ids:
-        text = f'camera {int(c)+1:02d}: '
+def print_scores(est_pose_file_paths, test_obj_ids=[12, 13]):
+    obj_ars = {}
+    all_ars = np.zeros(len(est_pose_file_paths))
+    test_ars = np.zeros(len(est_pose_file_paths))
+    for camera_i, file_path in enumerate(est_pose_file_paths):
+        est_opt = load_obj_pose_table(file_path)
+        obj_ids = set(est_opt['obj_id'])
         for obj_id in obj_ids:
-            if obj_id not in valid_objids:
-                continue
-            ar = np.mean(arr_cameraid_frame_objid_AR[arr_cameraid_frame_objid_AR[:, 2] == obj_id, 3])
-            text += f'obj {obj_id} AR={ar} '
-        print(text)
+            ar = np.mean(est_opt[est_opt['obj_id'] == obj_id]['average_recall'])
+            if obj_id not in obj_ars:
+                obj_ars[obj_id] = np.zeros(len(est_pose_file_paths))
+            obj_ars[obj_id][camera_i] = ar
+
+        ar = np.mean(est_opt[np.isin(est_opt['obj_id'], test_obj_ids)]['average_recall'])
+        all_ars[camera_i] = ar
+        ar = np.mean(est_opt['average_recall'])
+        test_ars[camera_i] = ar
+
+    print('         Camera 01     02     03     04     05     06     07     08      Max     Avg')
+    np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
+    for obj_id, ars in sorted(obj_ars.items()):
+        print(f'Obj {obj_id}\t\t{ars}\t{np.max(ars):0.3f}\t{np.mean(ars):0.3f}')
+    print(f'Test Objs\t{test_ars}\t{np.max(test_ars):0.3f}\t{np.mean(test_ars):0.3f}')
+    print(f'All Objs\t{all_ars}\t{np.max(all_ars):0.3f}\t{np.mean(all_ars):0.3f}')
 
 
 if __name__ == '__main__':
@@ -288,9 +300,9 @@ if __name__ == '__main__':
     camera_names = get_camera_names(scene_path)
     for camera_name in camera_names:
         camera_path = f"{scene_path}/{camera_name}"
-        est_pose_file_paths.append(f'{camera_path}/object_pose/PoseRBPF/frame_obj_poses.json')
-    scene_score(scene_name, est_pose_file_paths, f'{scene_path}/object_pose/PoseRBPF/scores.csv')
-    print_scores(f'{scene_path}/object_pose/PoseRBPF/scores.csv')
+        est_pose_file_paths.append(f'{camera_path}/object_pose/PoseRBPF/object_poses.csv')
+    # score_scene(scene_name, est_pose_file_paths, render=False)
+    print_scores(est_pose_file_paths)
 
 
 

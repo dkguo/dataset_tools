@@ -124,27 +124,32 @@ def create_scene(intrinsics, obj_ids=None, pre_load_meshes=None):
     return (scene, meshes, cam)
 
 
-def render_obj_pose(renderer, dict_id_poses, width=640, height=480, unit='m'):
+def render_obj_pose(renderer, dict_id_poses=None, list_id_pose=None, width=640, height=480, unit='mm'):
     scene, meshes, cam = renderer
     scene.add(cam, pose=np.eye(4))
 
-    for id, poses in dict_id_poses.items():
-        for pose in poses:
-            if np.all(pose == 0.0):
-                continue
-            pose_copy = pose.copy()
-            if len(pose) == 3:
-                pose_copy = np.vstack((pose, np.array([[0, 0, 0, 1]], dtype=np.float32)))
-            pose_copy[1] *= -1
-            pose_copy[2] *= -1
-            if unit == 'mm':
-                pose_copy[:3, 3] /= 1000.0
+    if list_id_pose is None:
+        list_id_pose = []
+        for id, poses in dict_id_poses.items():
+            for pose in poses:
+                list_id_pose.append((id, pose))
 
-            if id not in meshes:
-                new_meshes = load_meshes([id])
-                meshes[id] = new_meshes[id]
+    for id, pose in list_id_pose:
+        if np.all(pose == 0.0):
+            continue
+        pose_copy = pose.copy()
+        if len(pose) == 3:
+            pose_copy = np.vstack((pose, np.array([[0, 0, 0, 1]], dtype=np.float32)))
+        pose_copy[1] *= -1
+        pose_copy[2] *= -1
+        if unit == 'mm':
+            pose_copy[:3, 3] /= 1000.0
 
-            scene.add(meshes[id], pose=pose_copy)
+        if id not in meshes:
+            new_meshes = load_meshes([id])
+            meshes[id] = new_meshes[id]
+
+        scene.add(meshes[id], pose=pose_copy)
 
     r = pyrender.OffscreenRenderer(viewport_width=width, viewport_height=height)
     rendered_im, _ = r.render(scene)

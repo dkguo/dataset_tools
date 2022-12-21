@@ -6,15 +6,11 @@ import re
 
 import cv2
 import numpy as np
+import pandas as pd
 import yaml
-import scipy.io
 
 
-from dataset_tools.config import dataset_path
-
-
-def get_camera_names(scene_name):
-    scene_path = f'{dataset_path}/{scene_name}'
+def get_camera_names(scene_path):
     folders = os.listdir(scene_path)
     camera_seq = []
     for folder in folders:
@@ -23,8 +19,7 @@ def get_camera_names(scene_name):
     return sorted(camera_seq)
 
 
-def get_num_frame(scene_name):
-    scene_path = f'{dataset_path}/{scene_name}'
+def get_num_frame(scene_path):
     camera_names = get_camera_names(scene_path)
     nums = []
     for camera_name in camera_names:
@@ -128,6 +123,25 @@ def get_depth_scale(camera_meta_path, convert2unit='mm'):
     return depth_scale
 
 
+def load_gt_opt(gt_path):
+    """
+    :return: object_pose_table
+    """
+    with open(gt_path) as f:
+        im_gts = json.load(f)
+
+    opt = np.empty(0, dtype=[('obj_id', 'i4'), ('frame', 'i4'), ('pose', 'O')])
+    for frame, gts in im_gts.items():
+        for gt in gts:
+            R = np.array(gt['cam_R_m2c']).reshape((3, 3))
+            t = np.array(gt['cam_t_m2c'])  # mm
+            p = np.r_[np.c_[R, t], [[0, 0, 0, 1]]]
+            obj_id = gt['obj_id']
+
+            opt = np.append(opt, np.array([(obj_id, frame, p)], dtype=opt.dtype))
+    return opt
+
+
 def load_ground_truth(gt_path):
     """
     :return: dict_imid_objid_poses
@@ -227,6 +241,14 @@ def save_obj_poses(obj_poses, save_path):
         json.dump(save_dict, f, indent=4)
 
 
+def save_object_pose_table(opt, file_path):
+    if not os.path.exists(os.path.dirname(file_path)):
+        os.makedirs(os.path.dirname(file_path))
+    df = pd.DataFrame.from_records(opt)
+    df['pose'] = df['pose'].apply(np.ndarray.tolist)
+    df.to_csv(file_path, index=False)
+
+
 if __name__ == '__main__':
     # scene_path = '/home/gdk/data/1654267227_formated'
     # camera_names = get_camera_names(scene_path)
@@ -246,6 +268,8 @@ if __name__ == '__main__':
     # imgs = load_images(imgs_path, 'jpg')
     # save_mp4(imgs, imgs_path + '/video.mp4', 30)
 
-    scene_name = 'scene_2211191439_ext'
-    cameras_intics = load_cameras_intrisics(scene_name)
-    print(cameras_intics)
+    # scene_name = 'scene_2211191439_ext'
+    # cameras_intics = load_cameras_intrisics(scene_name)
+    # print(cameras_intics)
+
+    load_gt_opt('/home/gdk/Data/kitchen_countertops/scene_2210232307_01/camera_01_943222070458/scene_gt.json')
