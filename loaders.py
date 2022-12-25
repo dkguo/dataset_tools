@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from dataset_tools.config import dataset_path
+
 
 def get_camera_names(scene_path):
     folders = os.listdir(scene_path)
@@ -84,13 +86,15 @@ def intr2param(intrinsics):
     return fx, fy, cx, cy
 
 
-def load_extrinsics(extrinsics_path):
+def load_extrinsics(extrinsics_path, to_mm=False):
     with open(extrinsics_path, 'r') as file:
         ext = yaml.full_load(file)
     if 'EXTRINSICS' in ext:
         ext = ext['EXTRINSICS']
     for k, e in ext.items():
         ext[k] = np.array(e)
+        if to_mm:
+            ext[k][:3, 3] *= 1000.0
     return ext
 
 
@@ -142,103 +146,32 @@ def load_gt_opt(gt_path):
     return opt
 
 
-def load_ground_truth(gt_path):
+def load_object_pose_table(file_path, only_valid_pose=False, fill_None=False):
     """
-    :return: dict_imid_objid_poses
+    Returns:
+        obj_pose_table (opt), numpy recarray
     """
-    with open(gt_path) as f:
-        im_gts = json.load(f)
+    df = pd.read_csv(file_path, converters={'pose': lambda x: eval(f'np.array({x})')})
+    if only_valid_pose:
+        drop_idxs = []
+        for i, pose in enumerate(df['pose']):
+            if len(pose) != 4:
+                drop_idxs.append(i)
+        df = df.drop(index=drop_idxs)
+    opt = df.to_records(index=False)
 
-    gt_dict_imid_objid_poses = {}
-    for im_id, gts in im_gts.items():
-        gt_dict_id_poses = {}
-        for gt in gts:
-            R_gt = np.array(gt['cam_R_m2c']).reshape((3, 3))
-            t_gt = np.array(gt['cam_t_m2c'])  # mm
-            p_gt = np.c_[R_gt, t_gt]
-
-            obj_id = gt['obj_id']
-            if obj_id not in gt_dict_id_poses:
-                gt_dict_id_poses[obj_id] = []
-            gt_dict_id_poses[obj_id].append(p_gt)
-        gt_dict_imid_objid_poses[int(im_id)] = gt_dict_id_poses
-    return gt_dict_imid_objid_poses
-
-
-def load_bop_est_pose(bop_results_path, scene_id, image_id):
-    est_dict_id_poses = {}
-    with open(bop_results_path) as f:
-        reader = csv.reader(f)
-        for row in reader:
-            row_scene_id, im_id, obj_id, score, R, t, time = row
-            if row_scene_id == str(scene_id) and im_id == str(image_id):
-                R = np.fromstring(R, sep=' ').reshape((3, 3))
-                t = np.fromstring(t, sep=' ')   # mm
-                pose = np.c_[R, t]
-                if int(obj_id) not in est_dict_id_poses:
-                    est_dict_id_poses[int(obj_id)] = [pose]
-                else:
-                    est_dict_id_poses[int(obj_id)].append(pose)
-    return est_dict_id_poses
-
-
-def load_object_poses(file_path):
-    """
-    This function loads object poses assuming there is only one identical object in each frame.
-    :param file_path: the file has dict[frame][object_id] = pose
-
-    :return: object_poses: dict[object_id] = pose
-    """
-    with open(file_path) as f:
-        frame_object_poses = json.load(f)
-
-    # find obj keys
-    obj_ids = set()
-    for object_poses in frame_object_poses.values():
-        for obj_id in object_poses.keys():
-            obj_ids.add(obj_id)
-
-    object_poses = {}
-    for obj_id in obj_ids:
-        poses = []
-        last_frame = int(list(frame_object_poses.keys())[-1])
-        for frame in range(last_frame + 1):
-            if str(frame) in frame_object_poses:
-                if obj_id in frame_object_poses[str(frame)]:
-                    pose = np.array(frame_object_poses[str(frame)][obj_id])
-                    if pose.ndim > 2:
-                        pose = pose[0]
-                    assert pose.shape == (4, 4), pose
-                    poses.append(np.array(frame_object_poses[str(frame)][obj_id]))
-                else:
-                    poses.append(None)
-            else:
-                poses.append(None)
-        object_poses[obj_id] = poses
-
-    return object_poses
-
-
-def save_obj_poses(obj_poses, save_path):
-    """
-    Args:
-        obj_poses: dict[obj_id] = poses, poses could be a list or numpy array
-        save_path:
-    """
-    assert save_path[-5:] == '.json', 'must save to a file ends with .json'
-    save_dir = os.path.dirname(save_path)
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-
-    save_dict = {}
-    for obj_id, poses in obj_poses.items():
-        if type(poses).__module__ == np.__name__:
-            save_dict[obj_id] = poses.tolist()
-        elif type(poses[0]).__module__ == np.__name__:
-            save_dict[obj_id] = [pose.tolist() for pose in poses]
-
-    with open(save_path, 'w') as f:
-        json.dump(save_dict, f, indent=4)
+    if fill_None:
+        obj_ids = set(opt['obj_id'])
+        scene_name = opt[0]['scene_name']
+        for obj_id in obj_ids:
+            opt_obj = opt[opt['obj_id'] == obj_id]
+            for frame in range(get_num_frame(f'{dataset_path}/{scene_name}')):
+                if frame not in opt_obj['frame']:
+                    opt = np.append(opt, opt[-1])
+                    opt[-1]['obj_id'] = obj_id
+                    opt[-1]['frame'] = frame
+                    opt[-1]['pose'] = np.full((4, 4), np.nan)
+    return opt
 
 
 def save_object_pose_table(opt, file_path):

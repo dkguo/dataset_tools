@@ -1,3 +1,4 @@
+import glob
 import os
 # os.environ['PYOPENGL_PLATFORM'] = 'egl'
 import time
@@ -6,10 +7,12 @@ import cv2
 import numpy as np
 import pyrender
 import trimesh
+from tqdm import tqdm
 
 from dataset_tools.bop_toolkit.bop_toolkit_lib import renderer
 from dataset_tools.config import dataset_path
-from dataset_tools.loaders import load_intrinsics, load_ground_truth
+from dataset_tools.loaders import load_intrinsics, get_camera_names, load_object_pose_table
+from dataset_tools.view.preview_videos import combine_videos
 
 models_path = f'{dataset_path}/models'
 obj_model_paths = {1: f'{models_path}/002_master_chef_can/textured_simple.obj',
@@ -192,6 +195,39 @@ def compare_gt_est(gt_im, est_im):
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
     return comp
+
+
+def render_obj_pose_table(camera_path, pose_path, save_dir):
+    out = cv2.VideoWriter(f'{save_dir}/video.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (640, 480))
+
+    intrinsics = load_intrinsics(f'{camera_path}/camera_meta.yml')
+    py_renderer = create_scene(intrinsics)
+    color_img_paths = sorted(glob.glob(f'{camera_path}/rgb/*.png'))
+    opt = load_object_pose_table(pose_path)
+
+    for frame, image_path in enumerate(tqdm(color_img_paths)):
+        im = cv2.imread(image_path)
+
+        list_id_pose = opt[opt['frame'] == frame][['obj_id', 'pose']]
+        rendered_im = render_obj_pose(py_renderer, list_id_pose=list_id_pose)
+        out_im = overlay_imgs(im, rendered_im)
+
+        cv2.imwrite(f'{save_dir}/{frame:06d}.png', out_im)
+        out.write(out_im)
+
+    out.release()
+
+
+def render_scene(scene_name, save_folder_name, opt_name):
+    scene_path = f'{dataset_path}/{scene_name}'
+    for camera_name in get_camera_names(scene_path):
+        print(camera_name)
+        camera_path = f'{dataset_path}/{scene_name}/{camera_name}'
+        save_dir = f'{camera_path}/{save_folder_name}'
+        render_obj_pose_table(camera_path, f'{save_dir}/{opt_name}', save_dir)
+    video_paths = sorted(glob.glob(f'{scene_path}/camera_*/{save_folder_name}/video.mp4'))
+    save_path = f'{scene_path}/{save_folder_name}/video.mp4'
+    combine_videos(video_paths, save_path)
 
 
 if __name__ == '__main__':

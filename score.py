@@ -12,10 +12,9 @@ from tqdm import tqdm
 from dataset_tools.bop_toolkit.bop_toolkit_lib import pose_error, misc, inout, renderer
 from dataset_tools.bop_toolkit.bop_toolkit_lib.inout import load_depth
 from config import ply_model_paths, models_info_path, obj_model_paths, dataset_path, resolution_width, resolution_height
-from loaders import load_ground_truth, load_bop_est_pose, get_camera_names, load_object_poses, load_intrinsics, \
-    get_num_frame, load_gt_opt, save_object_pose_table
-from modules.object_pose.detect_post_processing import load_obj_pose_table
-from renderer import create_scene, render_obj_pose, overlay_imgs, compare_gt_est
+from loaders import get_camera_names, load_intrinsics, load_gt_opt, save_object_pose_table
+from modules.object_pose.detect_post_processing import load_object_pose_table
+from renderer import create_scene, render_obj_pose, compare_gt_est
 
 
 def pose_errors(p_est, p_gt, obj_id, models_info, error_types=['vsd', 'mssd', 'mspd'],
@@ -212,7 +211,7 @@ def score_scene(scene_name, est_pose_file_paths, render=False):
         camera_path = f"{scene_path}/{camera_names[camera_i]}"
 
         gt_opt = load_gt_opt(f"{camera_path}/scene_gt.json")
-        est_opt = load_obj_pose_table(est_file_path)
+        est_opt = load_object_pose_table(est_file_path)
         intric = load_intrinsics(f"{camera_path}/camera_meta.yml")
 
         if 'average_recall' not in est_opt.dtype.names:
@@ -271,7 +270,7 @@ def print_scores(est_pose_file_paths, test_obj_ids=[12, 13]):
     all_ars = np.zeros(len(est_pose_file_paths))
     test_ars = np.zeros(len(est_pose_file_paths))
     for camera_i, file_path in enumerate(est_pose_file_paths):
-        est_opt = load_obj_pose_table(file_path)
+        est_opt = load_object_pose_table(file_path)
         obj_ids = set(est_opt['obj_id'])
         for obj_id in obj_ids:
             ar = np.mean(est_opt[est_opt['obj_id'] == obj_id]['average_recall'])
@@ -280,28 +279,30 @@ def print_scores(est_pose_file_paths, test_obj_ids=[12, 13]):
             obj_ars[obj_id][camera_i] = ar
 
         ar = np.mean(est_opt[np.isin(est_opt['obj_id'], test_obj_ids)]['average_recall'])
-        all_ars[camera_i] = ar
-        ar = np.mean(est_opt['average_recall'])
         test_ars[camera_i] = ar
+        ar = np.mean(est_opt['average_recall'])
+        all_ars[camera_i] = ar
 
     print('         Camera 01     02     03     04     05     06     07     08      Max     Avg')
     np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
     for obj_id, ars in sorted(obj_ars.items()):
         print(f'Obj {obj_id}\t\t{ars}\t{np.max(ars):0.3f}\t{np.mean(ars):0.3f}')
+    print('--')
     print(f'Test Objs\t{test_ars}\t{np.max(test_ars):0.3f}\t{np.mean(test_ars):0.3f}')
     print(f'All Objs\t{all_ars}\t{np.max(all_ars):0.3f}\t{np.mean(all_ars):0.3f}')
 
 
 if __name__ == '__main__':
-    # single_image_score()
     scene_name = 'scene_2210232307_01'
-    est_pose_file_paths = []
+    predictor = 'kalman_filter'
     scene_path = f"{dataset_path}/{scene_name}"
-    camera_names = get_camera_names(scene_path)
-    for camera_name in camera_names:
+
+    est_pose_file_paths = []
+    for camera_name in get_camera_names(scene_path):
         camera_path = f"{scene_path}/{camera_name}"
-        est_pose_file_paths.append(f'{camera_path}/object_pose/PoseRBPF/object_poses.csv')
-    # score_scene(scene_name, est_pose_file_paths, render=False)
+        est_pose_file_paths.append(f'{camera_path}/object_pose/{predictor}/object_poses.csv')
+
+    score_scene(scene_name, est_pose_file_paths, render=False)
     print_scores(est_pose_file_paths)
 
 
