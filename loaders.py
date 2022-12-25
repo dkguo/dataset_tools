@@ -146,7 +146,7 @@ def load_gt_opt(gt_path):
     return opt
 
 
-def load_object_pose_table(file_path, only_valid_pose=False, fill_None=False):
+def load_object_pose_table(file_path, only_valid_pose=False, fill_nan=False):
     """
     Returns:
         obj_pose_table (opt), numpy recarray
@@ -160,7 +160,7 @@ def load_object_pose_table(file_path, only_valid_pose=False, fill_None=False):
         df = df.drop(index=drop_idxs)
     opt = df.to_records(index=False)
 
-    if fill_None:
+    if fill_nan:
         obj_ids = set(opt['obj_id'])
         scene_name = opt[0]['scene_name']
         for obj_id in obj_ids:

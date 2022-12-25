@@ -1,19 +1,14 @@
-import csv
 import json
-from collections import OrderedDict
 
 import cv2
-import imageio
 import numpy as np
-import pandas as pd
 from numpy.lib.recfunctions import append_fields
 from tqdm import tqdm
 
+from config import ply_model_paths, models_info_path, obj_model_paths, dataset_path, resolution_width, resolution_height
 from dataset_tools.bop_toolkit.bop_toolkit_lib import pose_error, misc, inout, renderer
 from dataset_tools.bop_toolkit.bop_toolkit_lib.inout import load_depth
-from config import ply_model_paths, models_info_path, obj_model_paths, dataset_path, resolution_width, resolution_height
-from loaders import get_camera_names, load_intrinsics, load_gt_opt, save_object_pose_table
-from modules.object_pose.detect_post_processing import load_object_pose_table
+from loaders import get_camera_names, load_intrinsics, load_gt_opt, save_object_pose_table, load_object_pose_table
 from renderer import create_scene, render_obj_pose, compare_gt_est
 
 
@@ -294,7 +289,7 @@ def print_scores(est_pose_file_paths, test_obj_ids=[12, 13]):
 
 if __name__ == '__main__':
     scene_name = 'scene_2210232307_01'
-    predictor = 'kalman_filter'
+    predictor = 'multiview_medium_smooth'
     scene_path = f"{dataset_path}/{scene_name}"
 
     est_pose_file_paths = []
