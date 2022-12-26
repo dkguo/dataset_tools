@@ -69,6 +69,7 @@ class YCBRenderer:
         self.textures = []
         self.is_textured = []
         self.objects = []
+        self.obj_ids = []
         self.texUnitUniform = None
         self.width = width
         self.height = height
