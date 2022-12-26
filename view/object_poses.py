@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from dataset_tools.config import dataset_path
 from dataset_tools.loaders import get_camera_names, load_intrinsics, load_extrinsics, get_num_frame
-from dataset_tools.renderer import create_scene, render_obj_pose, overlay_imgs
+from dataset_tools.view.renderer import create_scene, render_obj_pose, overlay_imgs
 from dataset_tools.view.preview_videos import combine_videos
 
 

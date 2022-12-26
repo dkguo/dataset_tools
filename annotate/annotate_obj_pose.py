@@ -8,13 +8,11 @@ Other annotations can be generated usign other scripts [calc_gt_info.py, calc_gt
 original repo: https://github.com/FLW-TUDO/3d_annotation_tool
 
 """
-import os
 import time
 
 # os.environ['PYOPENGL_PLATFORM'] = 'egl'
 
 import argparse
-from multiprocessing import Pool
 
 import numpy as np
 import open3d as o3d
@@ -27,7 +25,7 @@ import cv2
 from config import dataset_path
 from loaders import load_intrinsics, get_depth_scale, get_camera_names, load_extrinsics
 from process.helpers import add_border, collage_imgs
-from renderer import load_meshes, create_scene, model_names, render_obj_pose, overlay_imgs, ply_model_paths
+from dataset_tools.view.renderer import create_scene, model_names, render_obj_pose, overlay_imgs, ply_model_paths
 
 dist = 0.05
 deg = 30

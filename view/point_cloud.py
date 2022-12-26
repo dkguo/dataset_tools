@@ -20,7 +20,7 @@ import open3d.visualization.rendering as rendering
 
 from dataset_tools.config import dataset_path
 from dataset_tools.loaders import load_intrinsics, get_depth_scale, get_camera_names, load_extrinsics
-from dataset_tools.renderer import model_names, ply_model_paths
+from dataset_tools.view.renderer import model_names, ply_model_paths
 
 
 class AnnotationScene:

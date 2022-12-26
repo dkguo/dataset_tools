@@ -9,7 +9,7 @@ from config import ply_model_paths, models_info_path, obj_model_paths, dataset_p
 from dataset_tools.bop_toolkit.bop_toolkit_lib import pose_error, misc, inout, renderer
 from dataset_tools.bop_toolkit.bop_toolkit_lib.inout import load_depth
 from loaders import get_camera_names, load_intrinsics, load_gt_opt, save_object_pose_table, load_object_pose_table
-from renderer import create_scene, render_obj_pose, compare_gt_est
+from dataset_tools.view.renderer import create_scene, render_obj_pose, compare_gt_est
 
 
 def pose_errors(p_est, p_gt, obj_id, models_info, error_types=['vsd', 'mssd', 'mspd'],
