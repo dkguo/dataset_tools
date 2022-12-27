@@ -14,7 +14,7 @@ from tqdm import tqdm
 # from dataset_tools.bop_toolkit.bop_toolkit_lib import renderer
 # from dataset_tools.config import dataset_path
 from dataset_tools.loaders import load_intrinsics, get_camera_names, load_object_pose_table
-from dataset_tools.view.preview_videos import combine_videos
+from dataset_tools.view.videos import combine_videos
 #
 # models_path = f'{dataset_path}/models'
 # obj_model_paths = {1: f'{models_path}/002_master_chef_can/textured_simple.obj',

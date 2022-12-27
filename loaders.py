@@ -205,4 +205,11 @@ if __name__ == '__main__':
     # cameras_intics = load_cameras_intrisics(scene_name)
     # print(cameras_intics)
 
-    load_gt_opt('/home/gdk/Data/kitchen_countertops/scene_2210232307_01/camera_01_943222070458/scene_gt.json')
+    scene_name = 'scene_2210232307_01'
+    scene_path = f'{dataset_path}/{scene_name}'
+    for camera_name in get_camera_names(scene_path):
+        opt = load_gt_opt(f'{scene_path}/{camera_name}/scene_gt.json')
+        opt[opt['obj_id'] == 22]['obj_id'] = 26
+        opt[opt['obj_id'] == 12]['obj_id'] = 21
+        opt[opt['obj_id'] == 13]['obj_id'] = 24
+        save_object_pose_table(opt, f'{scene_path}/{camera_name}/object_pose/ground_truth.csv')

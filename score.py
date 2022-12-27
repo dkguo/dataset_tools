@@ -9,7 +9,7 @@ from config import ply_model_paths, models_info_path, obj_model_paths, dataset_p
 from dataset_tools.bop_toolkit.bop_toolkit_lib import pose_error, misc, inout, renderer
 from dataset_tools.bop_toolkit.bop_toolkit_lib.inout import load_depth
 from loaders import get_camera_names, load_intrinsics, load_gt_opt, save_object_pose_table, load_object_pose_table
-from dataset_tools.view.renderer import create_renderer, render_obj_pose, compare_gt_est
+from dataset_tools.view.renderer import create_renderer, render_obj_pose#, compare_gt_est
 
 
 def pose_errors(p_est, p_gt, obj_id, models_info, error_types=['vsd', 'mssd', 'mspd'],
@@ -249,7 +249,8 @@ def score_scene(scene_name, est_pose_file_paths, render=False):
                         cv2.waitKey(0)
                         cv2.destroyAllWindows()
 
-                    errors = pose_errors(p_est, p_gt, obj_id, models_info, K=intric, depth_im=depth_im, render=ren)
+                    errors = pose_errors(p_est, p_gt, obj_id, models_info, K=intric, depth_im=depth_im, render=ren,
+                                         error_types=['mssd', 'mspd'])
                     ar, score = score_single_error(errors)
                     if ar > est_opt[k]['average_recall']:
                         est_opt['average_recall'][k] = ar
