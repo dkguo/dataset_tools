@@ -158,4 +158,4 @@ def plot_poses_3d(poses):
 
 
 if __name__ == '__main__':
-    add_frame_num_to_video('/Users/gdk/Downloads/video.mp4')
+    add_frame_num_to_video('/home/gdk/Data/kitchen_countertops/scene_2210232307_01/video.mp4')

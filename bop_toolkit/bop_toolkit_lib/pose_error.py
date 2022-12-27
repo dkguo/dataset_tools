@@ -10,8 +10,11 @@ import math
 import numpy as np
 from scipy import spatial
 
-from bop_toolkit_lib import misc
-from bop_toolkit_lib import visibility
+from dataset_tools.bop_toolkit.bop_toolkit_lib import misc, visibility
+
+
+# from bop_toolkit_lib import misc
+# from bop_toolkit_lib import visibility
 
 
 def vsd(R_est, t_est, R_gt, t_gt, depth_test, K, delta, taus,

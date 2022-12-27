@@ -127,25 +127,6 @@ def get_depth_scale(camera_meta_path, convert2unit='mm'):
     return depth_scale
 
 
-def load_gt_opt(gt_path):
-    """
-    :return: object_pose_table
-    """
-    with open(gt_path) as f:
-        im_gts = json.load(f)
-
-    opt = np.empty(0, dtype=[('obj_id', 'i4'), ('frame', 'i4'), ('pose', 'O')])
-    for frame, gts in im_gts.items():
-        for gt in gts:
-            R = np.array(gt['cam_R_m2c']).reshape((3, 3))
-            t = np.array(gt['cam_t_m2c'])  # mm
-            p = np.r_[np.c_[R, t], [[0, 0, 0, 1]]]
-            obj_id = gt['obj_id']
-
-            opt = np.append(opt, np.array([(obj_id, frame, p)], dtype=opt.dtype))
-    return opt
-
-
 def load_object_pose_table(file_path, only_valid_pose=False, fill_nan=False):
     """
     Returns:
@@ -182,6 +163,26 @@ def save_object_pose_table(opt, file_path):
     df.to_csv(file_path, index=False)
 
 
+def load_all_opts(scene_path, opt_file_name, convert2origin=False):
+    extrinsics = load_extrinsics(f'{scene_path}/extrinsics.yml', to_mm=True)
+    opt_all = []
+    for camera_name in get_camera_names(scene_path):
+        opt_path = f"{scene_path}/{camera_name}/{opt_file_name}"
+        opt = load_object_pose_table(opt_path, only_valid_pose=True)
+        if convert2origin:
+            origin_camera = extrinsics[camera_name]
+            opt['pose'] = [origin_camera @ p for p in opt['pose']]
+        opt_all.append(opt)
+    opt_all = np.hstack(opt_all)
+    return opt_all
+
+
+def load_primitives_table(file_path):
+    df = pd.read_csv(file_path)
+    pt = df.to_records(index=False)
+    return pt
+
+
 if __name__ == '__main__':
     # scene_path = '/home/gdk/data/1654267227_formated'
     # camera_names = get_camera_names(scene_path)
@@ -205,11 +206,5 @@ if __name__ == '__main__':
     # cameras_intics = load_cameras_intrisics(scene_name)
     # print(cameras_intics)
 
-    scene_name = 'scene_2210232307_01'
-    scene_path = f'{dataset_path}/{scene_name}'
-    for camera_name in get_camera_names(scene_path):
-        opt = load_gt_opt(f'{scene_path}/{camera_name}/scene_gt.json')
-        opt[opt['obj_id'] == 22]['obj_id'] = 26
-        opt[opt['obj_id'] == 12]['obj_id'] = 21
-        opt[opt['obj_id'] == 13]['obj_id'] = 24
-        save_object_pose_table(opt, f'{scene_path}/{camera_name}/object_pose/ground_truth.csv')
+    pt = load_primtives_table('/home/gdk/Data/kitchen_countertops/scene_2210232307_01/primitives.csv')
+    print()

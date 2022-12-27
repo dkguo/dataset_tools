@@ -5,10 +5,10 @@ import numpy as np
 from numpy.lib.recfunctions import append_fields
 from tqdm import tqdm
 
-from config import ply_model_paths, models_info_path, obj_model_paths, dataset_path, resolution_width, resolution_height
+from config import obj_ply_paths, models_info_path, obj_model_paths, dataset_path, resolution_width, resolution_height
 from dataset_tools.bop_toolkit.bop_toolkit_lib import pose_error, misc, inout, renderer
 from dataset_tools.bop_toolkit.bop_toolkit_lib.inout import load_depth
-from loaders import get_camera_names, load_intrinsics, load_gt_opt, save_object_pose_table, load_object_pose_table
+from loaders import get_camera_names, load_intrinsics, save_object_pose_table, load_object_pose_table
 from dataset_tools.view.renderer import create_renderer, render_obj_pose#, compare_gt_est
 
 
@@ -159,13 +159,13 @@ def score_single_image():
     models_info = inout.load_json(models_info_path, keys_to_int=True)
     for obj_id in gt_dict_id_poses.keys():
         models_info[obj_id]['symmetry'] = misc.get_symmetry_transformations(models_info[obj_id], max_sym_disc_step=0.01)
-        models_info[obj_id]['pts'] = inout.load_ply(ply_model_paths[obj_id])['pts']
+        models_info[obj_id]['pts'] = inout.load_ply(obj_ply_paths[obj_id])['pts']
 
     # create a renderer
     height, width = depth_im.shape
     ren = renderer.create_renderer(width, height, 'vispy', mode='depth')
     for obj_id in gt_dict_id_poses.keys():
-        ren.add_object(obj_id, ply_model_paths[obj_id])
+        ren.add_object(obj_id, obj_ply_paths[obj_id])
 
     for obj_id in gt_dict_id_poses.keys():
         for p_gt in gt_dict_id_poses[obj_id]:
@@ -186,8 +186,8 @@ def score_scene(scene_name, est_pose_file_paths, render=False):
     camera_names = get_camera_names(scene_path)
 
     # find all obj_ids in scene_gt
-    gt_path = f"{scene_path}/{camera_names[0]}/scene_gt.json"
-    gt_opt = load_gt_opt(gt_path)
+    gt_path = f"{scene_path}/{camera_names[0]}/object_pose/ground_truth.csv"
+    gt_opt = load_object_pose_table(gt_path)
     obj_ids = set(gt_opt['obj_id'])
     print('obj_ids in ground truth:', obj_ids)
 
@@ -197,20 +197,22 @@ def score_scene(scene_name, est_pose_file_paths, render=False):
     for obj_id in obj_ids:
         if obj_id in models_info:
             models_info[obj_id]['symmetry'] = misc.get_symmetry_transformations(models_info[obj_id], max_sym_disc_step=0.01)
-            models_info[obj_id]['pts'] = inout.load_ply(ply_model_paths[obj_id])['pts']
-            ren.add_object(obj_id, ply_model_paths[obj_id])
+            models_info[obj_id]['pts'] = inout.load_ply(obj_ply_paths[obj_id])['pts']
+            ren.add_object(obj_id, obj_ply_paths[obj_id])
 
     # loop through cameras
     for camera_i, est_file_path in enumerate(est_pose_file_paths):
         print(camera_names[camera_i])
         camera_path = f"{scene_path}/{camera_names[camera_i]}"
 
-        gt_opt = load_gt_opt(f"{camera_path}/scene_gt.json")
+        gt_opt = load_object_pose_table(f"{camera_path}/object_pose/ground_truth.csv")
         est_opt = load_object_pose_table(est_file_path)
         intric = load_intrinsics(f"{camera_path}/camera_meta.yml")
 
         if 'average_recall' not in est_opt.dtype.names:
             est_opt = append_fields(est_opt, 'average_recall', np.zeros(est_opt.shape[0]), dtypes='f', usemask=False)
+        else:
+            est_opt['average_recall'] = 0.0
 
         # Loop through gt pose
         for frame, obj_id, p_gt in tqdm(gt_opt[['frame', 'obj_id', 'pose']]):
@@ -250,7 +252,7 @@ def score_scene(scene_name, est_pose_file_paths, render=False):
                         cv2.destroyAllWindows()
 
                     errors = pose_errors(p_est, p_gt, obj_id, models_info, K=intric, depth_im=depth_im, render=ren,
-                                         error_types=['mssd', 'mspd'])
+                                         error_types=['vsd', 'mssd', 'mspd'])
                     ar, score = score_single_error(errors)
                     if ar > est_opt[k]['average_recall']:
                         est_opt['average_recall'][k] = ar
@@ -261,7 +263,7 @@ def score_scene(scene_name, est_pose_file_paths, render=False):
         save_object_pose_table(est_opt, est_file_path)
 
 
-def print_scores(est_pose_file_paths, test_obj_ids=[12, 13]):
+def print_scores(est_pose_file_paths, test_obj_ids=[]):
     obj_ars = {}
     all_ars = np.zeros(len(est_pose_file_paths))
     test_ars = np.zeros(len(est_pose_file_paths))
@@ -274,8 +276,9 @@ def print_scores(est_pose_file_paths, test_obj_ids=[12, 13]):
                 obj_ars[obj_id] = np.zeros(len(est_pose_file_paths))
             obj_ars[obj_id][camera_i] = ar
 
-        ar = np.mean(est_opt[np.isin(est_opt['obj_id'], test_obj_ids)]['average_recall'])
-        test_ars[camera_i] = ar
+        if len(test_obj_ids) > 0:
+            ar = np.mean(est_opt[np.isin(est_opt['obj_id'], test_obj_ids)]['average_recall'])
+            test_ars[camera_i] = ar
         ar = np.mean(est_opt['average_recall'])
         all_ars[camera_i] = ar
 
@@ -290,7 +293,7 @@ def print_scores(est_pose_file_paths, test_obj_ids=[12, 13]):
 
 if __name__ == '__main__':
     scene_name = 'scene_2210232307_01'
-    predictor = 'multiview_medium_smooth'
+    predictor = 'primitive'
     scene_path = f"{dataset_path}/{scene_name}"
 
     est_pose_file_paths = []
@@ -298,8 +301,8 @@ if __name__ == '__main__':
         camera_path = f"{scene_path}/{camera_name}"
         est_pose_file_paths.append(f'{camera_path}/object_pose/{predictor}/object_poses.csv')
 
-    score_scene(scene_name, est_pose_file_paths, render=False)
-    print_scores(est_pose_file_paths)
+    # score_scene(scene_name, est_pose_file_paths, render=False)
+    print_scores(est_pose_file_paths, test_obj_ids=[21, 24])
 
 
 

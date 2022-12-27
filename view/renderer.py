@@ -1,5 +1,4 @@
 import glob
-from multiprocessing import Pool
 
 # import os
 # # os.environ['PYOPENGL_PLATFORM'] = 'egl'
@@ -10,88 +9,14 @@ from multiprocessing import Pool
 # import pyrender
 # import trimesh
 from tqdm import tqdm
+
 #
 # from dataset_tools.bop_toolkit.bop_toolkit_lib import renderer
 # from dataset_tools.config import dataset_path
-from dataset_tools.loaders import load_intrinsics, get_camera_names, load_object_pose_table
+from dataset_tools.loaders import get_camera_names, load_object_pose_table, load_all_opts
 from dataset_tools.view.videos import combine_videos
-#
-# models_path = f'{dataset_path}/models'
-# obj_model_paths = {1: f'{models_path}/002_master_chef_can/textured_simple.obj',
-#                    2: f'{models_path}/003_cracker_box/textured_simple.obj',
-#                    3: f'{models_path}/004_sugar_box/textured_simple.obj',
-#                    4: f'{models_path}/005_tomato_soup_can/textured_simple.obj',
-#                    5: f'{models_path}/006_mustard_bottle/textured_simple.obj',
-#                    6: f'{models_path}/007_tuna_fish_can/textured_simple.obj',
-#                    7: f'{models_path}/008_pudding_box/textured_simple.obj',
-#                    8: f'{models_path}/009_gelatin_box/textured_simple.obj',
-#                    9: f'{models_path}/010_potted_meat_can/textured_simple.obj',
-#                    10: f'{models_path}/011_banana/textured_simple.obj',
-#                    11: f'{models_path}/019_pitcher_base/textured_simple.obj',
-#                    12: f'{models_path}/021_bleach_cleanser/textured_simple.obj',
-#                    13: f'{models_path}/024_bowl/textured_simple.obj',
-#                    14: f'{models_path}/025_mug/textured_simple.obj',
-#                    15: f'{models_path}/035_power_drill/textured_simple.obj',
-#                    16: f'{models_path}/036_wood_block/textured_simple.obj',
-#                    17: f'{models_path}/037_scissors/textured_simple.obj',
-#                    18: f'{models_path}/040_large_marker/textured_simple.obj',
-#                    19: f'{models_path}/051_large_clamp/textured_simple.obj',
-#                    20: f'{models_path}/052_extra_large_clamp/textured_simple.obj',
-#                    21: f'{models_path}/061_foam_brick/textured_simple.obj',
-#                    22: f'{models_path}/026_sponge/textured_simple.obj'}
-#
-# ply_models_path = f'{dataset_path}/ply_models'
-# ply_model_paths = {1: f'{ply_models_path}/obj_000001.ply',
-#                    2: f'{ply_models_path}/obj_000002.ply',
-#                    3: f'{ply_models_path}/obj_000003.ply',
-#                    4: f'{ply_models_path}/obj_000004.ply',
-#                    5: f'{ply_models_path}/obj_000005.ply',
-#                    6: f'{ply_models_path}/obj_000006.ply',
-#                    7: f'{ply_models_path}/obj_000007.ply',
-#                    8: f'{ply_models_path}/obj_000008.ply',
-#                    9: f'{ply_models_path}/obj_000009.ply',
-#                    10: f'{ply_models_path}/obj_000010.ply',
-#                    11: f'{ply_models_path}/obj_000011.ply',
-#                    12: f'{ply_models_path}/obj_000012.ply',
-#                    13: f'{ply_models_path}/obj_000013.ply',
-#                    14: f'{ply_models_path}/obj_000014.ply',
-#                    15: f'{ply_models_path}/obj_000015.ply',
-#                    16: f'{ply_models_path}/obj_000016.ply',
-#                    17: f'{ply_models_path}/obj_000017.ply',
-#                    18: f'{ply_models_path}/obj_000018.ply',
-#                    19: f'{ply_models_path}/obj_000019.ply',
-#                    20: f'{ply_models_path}/obj_000020.ply',
-#                    21: f'{ply_models_path}/obj_000021.ply',
-#                    22: '/home/gdk/Data/kitchen_countertops/models/026_sponge/textured_simple.obj.ply'}
-#
-# models_info_path = '/media/gdk/Data/Datasets/bop_datasets/ycbv/models_eval/models_info.json'
-#
-# model_names = [
-#      'master_chef_can',
-#      'cracker_box',
-#      'sugar_box',
-#      'tomato_soup_can',
-#      'mustard_bottle',
-#      'tuna_fish_can',
-#      'pudding_box',
-#      'gelatin_box',
-#      'potted_meat_can',
-#      'banana',
-#      'pitcher_base',
-#      'bleach_cleanser',
-#      'bowl',
-#      'mug',
-#      'power_drill',
-#      'wood_block',
-#      'scissors',
-#      'large_marker',
-#      'large_clamp',
-#      'extra_large_clamp',
-#      'foam_brick',
-#      'sponge'
-# ]
-#
-#
+
+
 # def overlay_imgs(im1, im2, p1=0.5, p2=0.5):
 #     im = p1 * im1.astype(np.float32) + p2 * im2.astype(np.float32)
 #     im[im > 255] = 255
@@ -225,17 +150,13 @@ def render_obj_pose_table(camera_path, pose_path, save_dir, renderer=None):
 
 def render_scene(scene_name, save_folder_name, opt_name):
     scene_path = f'{dataset_path}/{scene_name}'
-    args = []
-    renderer = create_renderer()
+    opt_all = load_all_opts(scene_path, f'{save_folder_name}/{opt_name}')
+    renderer = create_renderer(obj_ids=np.unique(opt_all['obj_id']).tolist())
     for camera_name in get_camera_names(scene_path):
         print(camera_name)
         camera_path = f'{dataset_path}/{scene_name}/{camera_name}'
         save_dir = f'{camera_path}/{save_folder_name}'
-        # args.append((camera_path, f'{save_dir}/{opt_name}', save_dir))
         render_obj_pose_table(camera_path, f'{save_dir}/{opt_name}', save_dir, renderer)
-
-    # with Pool(processes=2) as pool:
-    #     pool.starmap(render_obj_pose_table, args)
 
     video_paths = sorted(glob.glob(f'{scene_path}/camera_*/{save_folder_name}/video.mp4'))
     save_path = f'{scene_path}/{save_folder_name}/video.mp4'
@@ -338,42 +259,9 @@ import numpy as np
 import torch
 from transforms3d.quaternions import mat2quat
 
-from dataset_tools.config import dataset_path, resolution_width, resolution_height
+from dataset_tools.config import dataset_path, resolution_width, resolution_height, obj_model_paths, obj_texture_paths
 from dataset_tools.loaders import load_intrinsics
 from dataset_tools.view.ycb_renderer.ycb_renderer import YCBRenderer
-
-models_path = f'{dataset_path}/models'
-ycb_model_names = [
-    "002_master_chef_can",
-    "003_cracker_box",
-    "004_sugar_box",
-    "005_tomato_soup_can",
-    "006_mustard_bottle",
-    "007_tuna_fish_can",
-    "008_pudding_box",
-    "009_gelatin_box",
-    "010_potted_meat_can",
-    "011_banana",
-    "019_pitcher_base",
-    "021_bleach_cleanser",
-    "024_bowl",
-    "025_mug",
-    "035_power_drill",
-    "036_wood_block",
-    "037_scissors",
-    "040_large_marker",
-    "051_large_clamp",
-    "052_extra_large_clamp",
-    "061_foam_brick",
-    "026_sponge"
-]
-
-obj_model_paths = {}
-obj_texture_paths = {}
-for model_name in ycb_model_names:
-    obj_id = int(model_name[:3])
-    obj_model_paths[obj_id] = f'{models_path}/{model_name}/textured_simple.obj'
-    obj_texture_paths[obj_id] = f'{models_path}/{model_name}/texture_map.png'
 
 
 def overlay_imgs(im1, im2, p1=0.5, p2=0.5):
@@ -383,12 +271,11 @@ def overlay_imgs(im1, im2, p1=0.5, p2=0.5):
     return im
 
 
-def load_objs(renderer, obj_ids):
-    for obj_id in obj_ids:
-        t = time.time()
-        renderer.obj_ids.append(obj_id)
-        renderer.load_objects([obj_model_paths[obj_id]], [obj_texture_paths[obj_id]])
-        print(f'load obj {obj_id}, takes {time.time() -t} seconds')
+def load_objs(renderer, obj_ids: list):
+    t = time.time()
+    renderer.obj_ids += obj_ids
+    renderer.load_objects([obj_model_paths[o] for o in obj_ids], [obj_texture_paths[o] for o in obj_ids])
+    print(f'load obj {obj_ids}, takes {time.time() -t} seconds')
 
 
 def set_intrinsics(renderer, intrinsics):
