@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from dataset_tools.config import dataset_path
 from dataset_tools.loaders import get_camera_names, load_intrinsics, load_extrinsics, get_num_frame
-from dataset_tools.view.renderer import create_scene, render_obj_pose, overlay_imgs
+from dataset_tools.view.renderer import create_renderer, render_obj_pose, overlay_imgs
 from dataset_tools.view.preview_videos import combine_videos
 
 
@@ -46,7 +46,7 @@ def view_obj_poses(scene_name, camera_ids, obj_poses, save_folder_name):
         out_video = cv2.VideoWriter(f'{output_dir}/video.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (640, 480))
 
         intrinsics = load_intrinsics(f'{scene_path}/{camera_name}/camera_meta.yml')
-        py_renderer = create_scene(intrinsics)
+        py_renderer = create_renderer(intrinsics)
 
         for frame in tqdm(range(num_frames)):
             im_file = f'{scene_path}/{camera_name}/rgb/{frame:06d}.png'

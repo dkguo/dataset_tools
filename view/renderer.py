@@ -1,4 +1,6 @@
-# import glob
+import glob
+from multiprocessing import Pool
+
 # import os
 # # os.environ['PYOPENGL_PLATFORM'] = 'egl'
 # import time
@@ -7,12 +9,12 @@
 # import numpy as np
 # import pyrender
 # import trimesh
-# from tqdm import tqdm
+from tqdm import tqdm
 #
 # from dataset_tools.bop_toolkit.bop_toolkit_lib import renderer
 # from dataset_tools.config import dataset_path
-# from dataset_tools.loaders import load_intrinsics, get_camera_names, load_object_pose_table
-# from dataset_tools.view.preview_videos import combine_videos
+from dataset_tools.loaders import load_intrinsics, get_camera_names, load_object_pose_table
+from dataset_tools.view.preview_videos import combine_videos
 #
 # models_path = f'{dataset_path}/models'
 # obj_model_paths = {1: f'{models_path}/002_master_chef_can/textured_simple.obj',
@@ -197,37 +199,47 @@
 #     return comp
 #
 #
-# def render_obj_pose_table(camera_path, pose_path, save_dir):
-#     out = cv2.VideoWriter(f'{save_dir}/video.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (640, 480))
-#
-#     intrinsics = load_intrinsics(f'{camera_path}/camera_meta.yml')
-#     py_renderer = create_scene(intrinsics)
-#     color_img_paths = sorted(glob.glob(f'{camera_path}/rgb/*.png'))
-#     opt = load_object_pose_table(pose_path)
-#
-#     for frame, image_path in enumerate(tqdm(color_img_paths)):
-#         im = cv2.imread(image_path)
-#
-#         list_id_pose = opt[opt['frame'] == frame][['obj_id', 'pose']]
-#         rendered_im = render_obj_pose(py_renderer, list_id_pose=list_id_pose)
-#         out_im = overlay_imgs(im, rendered_im)
-#
-#         cv2.imwrite(f'{save_dir}/{frame:06d}.png', out_im)
-#         out.write(out_im)
-#
-#     out.release()
-#
-#
-# def render_scene(scene_name, save_folder_name, opt_name):
-#     scene_path = f'{dataset_path}/{scene_name}'
-#     for camera_name in get_camera_names(scene_path):
-#         print(camera_name)
-#         camera_path = f'{dataset_path}/{scene_name}/{camera_name}'
-#         save_dir = f'{camera_path}/{save_folder_name}'
-#         render_obj_pose_table(camera_path, f'{save_dir}/{opt_name}', save_dir)
-#     video_paths = sorted(glob.glob(f'{scene_path}/camera_*/{save_folder_name}/video.mp4'))
-#     save_path = f'{scene_path}/{save_folder_name}/video.mp4'
-#     combine_videos(video_paths, save_path)
+def render_obj_pose_table(camera_path, pose_path, save_dir, renderer=None):
+    out = cv2.VideoWriter(f'{save_dir}/video.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (640, 480))
+
+    intrinsics = load_intrinsics(f'{camera_path}/camera_meta.yml')
+    if renderer is None:
+        renderer = create_renderer(intrinsics)
+    else:
+        set_intrinsics(renderer, intrinsics)
+    color_img_paths = sorted(glob.glob(f'{camera_path}/rgb/*.png'))
+    opt = load_object_pose_table(pose_path)
+
+    for frame, image_path in enumerate(tqdm(color_img_paths)):
+        im = cv2.imread(image_path)
+
+        list_id_pose = opt[opt['frame'] == frame][['obj_id', 'pose']]
+        rendered_im = render_obj_pose(renderer, list_id_pose=list_id_pose)
+        out_im = overlay_imgs(im, rendered_im)
+
+        cv2.imwrite(f'{save_dir}/{frame:06d}.png', out_im)
+        out.write(out_im)
+
+    out.release()
+
+
+def render_scene(scene_name, save_folder_name, opt_name):
+    scene_path = f'{dataset_path}/{scene_name}'
+    args = []
+    renderer = create_renderer()
+    for camera_name in get_camera_names(scene_path):
+        print(camera_name)
+        camera_path = f'{dataset_path}/{scene_name}/{camera_name}'
+        save_dir = f'{camera_path}/{save_folder_name}'
+        # args.append((camera_path, f'{save_dir}/{opt_name}', save_dir))
+        render_obj_pose_table(camera_path, f'{save_dir}/{opt_name}', save_dir, renderer)
+
+    # with Pool(processes=2) as pool:
+    #     pool.starmap(render_obj_pose_table, args)
+
+    video_paths = sorted(glob.glob(f'{scene_path}/camera_*/{save_folder_name}/video.mp4'))
+    save_path = f'{scene_path}/{save_folder_name}/video.mp4'
+    combine_videos(video_paths, save_path)
 #
 #
 # if __name__ == '__main__':
@@ -373,16 +385,23 @@ def overlay_imgs(im1, im2, p1=0.5, p2=0.5):
 
 def load_objs(renderer, obj_ids):
     for obj_id in obj_ids:
+        t = time.time()
         renderer.obj_ids.append(obj_id)
         renderer.load_objects([obj_model_paths[obj_id]], [obj_texture_paths[obj_id]])
+        print(f'load obj {obj_id}, takes {time.time() -t} seconds')
 
 
-def create_scene(intrinsics, obj_ids=None, width=resolution_width, height=resolution_height):
-    renderer = YCBRenderer(width, height, render_marker=False)
+def set_intrinsics(renderer, intrinsics):
     renderer.set_camera_default()
     renderer.set_projection_matrix(resolution_width, resolution_height,
                                    intrinsics[0, 0], intrinsics[1, 1],
                                    intrinsics[0, 2], intrinsics[1, 2], 0.01, 10)
+
+
+def create_renderer(intrinsics=None, obj_ids=None, width=resolution_width, height=resolution_height):
+    renderer = YCBRenderer(width, height, render_marker=False)
+    if intrinsics is not None:
+        set_intrinsics(renderer, intrinsics)
     if obj_ids is not None:
         load_objs(renderer, obj_ids)
     return renderer
@@ -394,6 +413,8 @@ def render_obj_pose(renderer, list_id_pose, width=resolution_width, height=resol
     pose_v = np.zeros((7,))
     for obj_id, pose in list_id_pose:
         t_v = pose[:3, 3]
+        if unit == 'mm':
+            t_v /= 1000.0
         q_v = mat2quat(pose[:3, :3])
         pose_v[:3] = t_v
         pose_v[3:] = q_v
@@ -408,9 +429,9 @@ def render_obj_pose(renderer, list_id_pose, width=resolution_width, height=resol
     # render
     tensor = torch.cuda.FloatTensor(int(height), int(width), 4)
     seg_cuda = torch.cuda.FloatTensor(int(height), int(width), 4)
-    pc_cuda = torch.cuda.FloatTensor(int(height), int(width), 4)
+    # pc_cuda = torch.cuda.FloatTensor(int(height), int(width), 4)
     renderer.set_poses(poses)
-    renderer.render(obj_idxes, tensor, seg_cuda, pc2_tensor=pc_cuda)
+    renderer.render(obj_idxes, tensor, seg_cuda)
 
     im = tensor.flip(0).data.cpu().numpy().reshape(resolution_height, resolution_width, 4)
     return cv2.cvtColor(im[:, :, :3], cv2.COLOR_RGB2BGR) * 255
@@ -427,11 +448,11 @@ if __name__ == '__main__':
     intrinsics = load_intrinsics(f'{test_path}/meta.yml')
     test_im = cv2.imread(f'{test_path}/{test_img_name}')
 
-    renderer = create_scene(intrinsics)
-    render_obj_pose(renderer, list_id_poses)
+    renderer = create_renderer(intrinsics)
+    render_obj_pose(renderer, list_id_poses, unit='m')
 
     t = time.time()
-    rendered_im = render_obj_pose(renderer, list_id_poses)
+    rendered_im = render_obj_pose(renderer, list_id_poses, unit='m')
     rendered_im = overlay_imgs(test_im, rendered_im)
     print(time.time() - t)
 

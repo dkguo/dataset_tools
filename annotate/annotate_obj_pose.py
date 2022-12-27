@@ -25,7 +25,7 @@ import cv2
 from config import dataset_path
 from loaders import load_intrinsics, get_depth_scale, get_camera_names, load_extrinsics
 from process.helpers import add_border, collage_imgs
-from dataset_tools.view.renderer import create_scene, model_names, render_obj_pose, overlay_imgs, ply_model_paths
+from dataset_tools.view.renderer import create_renderer, model_names, render_obj_pose, overlay_imgs, ply_model_paths
 
 dist = 0.05
 deg = 30
@@ -119,7 +119,7 @@ class AppWindow:
         self.py_renderers = []
         for camera in self.camera_names:
             cam_K = load_intrinsics(f'{scene_path}/{camera}/camera_meta.yml')
-            self.py_renderers.append(create_scene(cam_K, pre_load_meshes=self.pre_load_meshes))
+            self.py_renderers.append(create_renderer(cam_K))
         self.extrinsics = load_extrinsics(f'{scene_path}/extrinsics.yml')
         self.rgb_imgs = []
         self.active_objs_pose = {}

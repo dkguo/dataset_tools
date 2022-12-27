@@ -31,6 +31,9 @@ def combine_videos(video_paths, save_path, speed=1):
         print('Combining', video_path)
         clips.append(VideoFileClip(video_path))
 
+    if not os.path.exists(os.path.dirname(save_path)):
+        os.makedirs(os.path.dirname(save_path))
+
     final_clip = clips_array(np.reshape(clips, (2, -1)))
     final_clip = final_clip.fx(vfx.speedx, speed)
     final_clip.write_videofile(save_path)

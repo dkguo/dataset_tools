@@ -9,7 +9,7 @@ from config import ply_model_paths, models_info_path, obj_model_paths, dataset_p
 from dataset_tools.bop_toolkit.bop_toolkit_lib import pose_error, misc, inout, renderer
 from dataset_tools.bop_toolkit.bop_toolkit_lib.inout import load_depth
 from loaders import get_camera_names, load_intrinsics, load_gt_opt, save_object_pose_table, load_object_pose_table
-from dataset_tools.view.renderer import create_scene, render_obj_pose, compare_gt_est
+from dataset_tools.view.renderer import create_renderer, render_obj_pose, compare_gt_est
 
 
 def pose_errors(p_est, p_gt, obj_id, models_info, error_types=['vsd', 'mssd', 'mspd'],
@@ -138,7 +138,7 @@ def score_single_image():
 
     # render gt and est pose
     if render:
-        py_renderer = create_scene(intric, obj_model_paths.keys())
+        py_renderer = create_renderer(intric, obj_model_paths.keys())
 
         gt_im = render_obj_pose(py_renderer, gt_dict_id_poses, unit='mm')
         # gt_im = overlay_imgs(color_im, gt_im)
@@ -232,7 +232,7 @@ def score_scene(scene_name, est_pose_file_paths, render=False):
                     # render gt and est pose
                     if render:
                         print(f'Frame: {frame}, obj_id: {obj_id}')
-                        py_renderer = create_scene(intric, obj_ids)
+                        py_renderer = create_renderer(intric, obj_ids)
 
                         gt_im = render_obj_pose(py_renderer, list_id_pose=[(obj_id, p_gt)], unit='mm')
                         # gt_im = overlay_imgs(color_im, gt_im)
