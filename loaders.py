@@ -25,7 +25,7 @@ def get_num_frame(scene_path):
     camera_names = get_camera_names(scene_path)
     nums = []
     for camera_name in camera_names:
-        files = glob.glob(f'{scene_path}/{camera_name}/rgb/*.png')
+        files = glob.glob(f"{scene_path}/{camera_name}/rgb/*.png")
         nums.append(len(files))
     return min(nums)
 

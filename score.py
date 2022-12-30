@@ -293,7 +293,7 @@ def print_scores(est_pose_file_paths, test_obj_ids=[]):
 
 if __name__ == '__main__':
     scene_name = 'scene_2210232307_01'
-    predictor = 'primitive'
+    predictor = 'deepim'
     scene_path = f"{dataset_path}/{scene_name}"
 
     est_pose_file_paths = []
@@ -301,7 +301,7 @@ if __name__ == '__main__':
         camera_path = f"{scene_path}/{camera_name}"
         est_pose_file_paths.append(f'{camera_path}/object_pose/{predictor}/object_poses.csv')
 
-    # score_scene(scene_name, est_pose_file_paths, render=False)
+    score_scene(scene_name, est_pose_file_paths, render=False)
     print_scores(est_pose_file_paths, test_obj_ids=[21, 24])
 
 

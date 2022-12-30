@@ -133,7 +133,7 @@ def render_obj_pose_table(camera_path, pose_path, save_dir, renderer=None):
     else:
         set_intrinsics(renderer, intrinsics)
     color_img_paths = sorted(glob.glob(f'{camera_path}/rgb/*.png'))
-    opt = load_object_pose_table(pose_path)
+    opt = load_object_pose_table(pose_path, only_valid_pose=True)
 
     for frame, image_path in enumerate(tqdm(color_img_paths)):
         im = cv2.imread(image_path)
