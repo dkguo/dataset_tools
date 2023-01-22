@@ -14,11 +14,11 @@ from dataset_tools.view.helpers import add_frame_num_to_video
 def png2video(camera_path, frame_rate=30):
     print('Saving', camera_path)
 
-    img = cv2.imread(f'{camera_path}/rgb/000000.png')
+    img = cv2.imread(f'{camera_path}/000000.png')
     dim = (img.shape[1], img.shape[0])
     out_video = cv2.VideoWriter(f'{camera_path}/video.mp4', cv2.VideoWriter_fourcc(*'mp4v'), frame_rate, dim)
 
-    for img_path in tqdm(sorted(glob.glob(f'{camera_path}/rgb/*.png'))):
+    for img_path in tqdm(sorted(glob.glob(f'{camera_path}/*.png'))):
         img = cv2.imread(img_path)
         out_video.write(img)
 
