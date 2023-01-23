@@ -12,7 +12,7 @@ from dataset_tools.view.helpers import add_frame_num_to_video
 
 
 def png2video(camera_path, frame_rate=30):
-    print('Saving', camera_path)
+    print(f'Saving {camera_path}/video.mp4')
 
     img = cv2.imread(f'{camera_path}/000000.png')
     dim = (img.shape[1], img.shape[0])
