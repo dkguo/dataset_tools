@@ -62,7 +62,8 @@ class Open3dWindow:
         self._scene_control.add_child(self._scene_label)
 
         # display frame number
-        self._frame_label = gui.Label("Frame: " + f'{0:06}')
+        self._frame_label = gui.Label('')
+        self._update_frame_label()
         self._scene_control.add_child(self._frame_label)
 
         # frame navigation
@@ -80,6 +81,7 @@ class Open3dWindow:
         h.add_child(self._next_frame_button)
         h.add_stretch()
         self._scene_control.add_child(h)
+        self.scene_widget.set_on_key(self._transform)
 
     def _on_layout(self, layout_context):
         r = self.window.content_rect
@@ -93,6 +95,12 @@ class Open3dWindow:
         pass
 
     def _on_next_frame(self):
+        pass
+
+    def _update_frame_label(self):
+        self._frame_label.text = f"Frame: {self.frame_num:06}"
+
+    def _transform(self, event):
         pass
 
 
