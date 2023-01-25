@@ -18,30 +18,29 @@ import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 
-from dataset_tools.config import dataset_path
+from dataset_tools.config import dataset_path, ycb_model_names, obj_ply_paths
 from dataset_tools.loaders import load_intrinsics, get_depth_scale, get_camera_names, load_extrinsics
-from dataset_tools.view.renderer import model_names, ply_model_paths
 
 
-class AnnotationScene:
-    def __init__(self, scene_point_cloud, image_num):
-        self.annotation_scene = scene_point_cloud
-        self.image_num = image_num
-
-        self.obj_list = list()
-
-    def add_obj(self, obj_geometry, obj_name, obj_instance, transform=np.identity(4)):
-        self.obj_list.append(self.SceneObject(obj_geometry, obj_name, obj_instance, transform))
-
-    def get_objects(self):
-        return self.obj_list[:]
-
-    class SceneObject:
-        def __init__(self, obj_geometry, obj_name, obj_instance, transform):
-            self.obj_geometry = obj_geometry
-            self.obj_name = obj_name
-            self.obj_instance = obj_instance
-            self.transform = transform
+# class AnnotationScene:
+#     def __init__(self, scene_point_cloud, image_num):
+#         self.annotation_scene = scene_point_cloud
+#         self.image_num = image_num
+#
+#         self.obj_list = list()
+#
+#     def add_obj(self, obj_geometry, obj_name, obj_instance, transform=np.identity(4)):
+#         self.obj_list.append(self.SceneObject(obj_geometry, obj_name, obj_instance, transform))
+#
+#     def get_objects(self):
+#         return self.obj_list[:]
+#
+#     class SceneObject:
+#         def __init__(self, obj_geometry, obj_name, obj_instance, transform):
+#             self.obj_geometry = obj_geometry
+#             self.obj_name = obj_name
+#             self.obj_instance = obj_instance
+#             self.transform = transform
 
 
 class Settings:
@@ -334,7 +333,7 @@ class AppWindow:
             up = np.array([0, -1, 0])
             self.pc_scene_widget.look_at(center, eye, up)
 
-            self._annotation_scene = AnnotationScene(geometry, image_num)
+            # self._annotation_scene = AnnotationScene(geometry, image_num)
             self._meshes_used.set_items([])  # clear list from last loaded scene
 
             # load values if an annotation already exists
@@ -355,10 +354,10 @@ class AppWindow:
             scene_data = data[str(image_num)]
             for obj in scene_data:
                 # add object to annotation_scene object
-                obj_geometry = o3d.io.read_point_cloud(ply_model_paths[int(obj['obj_id'])])
+                obj_geometry = o3d.io.read_point_cloud(obj_ply_paths[int(obj['obj_id'])])
                 obj_geometry.points = o3d.utility.Vector3dVector(
                     np.array(obj_geometry.points) / 1000)  # convert mm to meter
-                model_name = model_names[int(obj['obj_id']) - 1]
+                model_name = ycb_model_names[int(obj['obj_id']) - 1]
                 meshes = self._annotation_scene.get_objects()  # update list after adding current object
                 meshes = [i.obj_name for i in meshes]
                 obj_instance = self._obj_instance_count(model_name, meshes)
@@ -384,7 +383,7 @@ class AppWindow:
         self._meshes_used.set_items(meshes)
 
     def update_obj_list(self):
-        self._meshes_available.set_items(model_names)
+        self._meshes_available.set_items(ycb_model_names)
 
     def _on_next_image(self):
         if self._annotation_scene.image_num + 1 >= len(

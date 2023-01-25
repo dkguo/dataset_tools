@@ -22,10 +22,10 @@ import os
 import json
 import cv2
 
-from config import dataset_path
-from loaders import load_intrinsics, get_depth_scale, get_camera_names, load_extrinsics
-from process.helpers import add_border, collage_imgs
-from dataset_tools.view.renderer import create_renderer, model_names, render_obj_pose, overlay_imgs, ply_model_paths
+from dataset_tools.config import dataset_path, ycb_model_names, obj_ply_paths
+from dataset_tools.loaders import load_intrinsics, get_depth_scale, get_camera_names, load_extrinsics
+from dataset_tools.view.helpers import add_border, collage_imgs
+from dataset_tools.view.renderer import create_renderer, render_obj_pose, overlay_imgs
 
 dist = 0.05
 deg = 30
@@ -117,9 +117,9 @@ class AppWindow:
         self.pre_load_meshes = {}
         self.camera_names = sorted(get_camera_names(scene_path))
         self.py_renderers = []
-        for camera in self.camera_names:
-            cam_K = load_intrinsics(f'{scene_path}/{camera}/camera_meta.yml')
-            self.py_renderers.append(create_renderer(cam_K))
+        # for camera in self.camera_names:
+        #     cam_K = load_intrinsics(f'{scene_path}/{camera}/camera_meta.yml')
+        #     self.py_renderers.append(create_renderer(cam_K))
         self.extrinsics = load_extrinsics(f'{scene_path}/extrinsics.yml')
         self.rgb_imgs = []
         self.active_objs_pose = {}
@@ -478,7 +478,7 @@ class AppWindow:
                     T_master_to_cam0 = self.extrinsics[self.camera_names[0]]
                     transform_cam_to_object = T_cam_to_master @ T_master_to_cam0 @ obj.transform
                     translation = list(transform_cam_to_object[0:3, 3] * 1000)  # convert meter to mm
-                    obj_id = model_names.index(obj.obj_name[:-2]) + 1  # assuming max number of object of same object 10
+                    obj_id = ycb_model_names.index(obj.obj_name[:-2]) + 1  # assuming max number of object of same object 10
                     obj_data = {
                         "cam_R_m2c": transform_cam_to_object[0:3, 0:3].tolist(),  # rotation matrix
                         "cam_t_m2c": translation,  # translation
@@ -587,7 +587,7 @@ class AppWindow:
             print('no obj selected')
             return
 
-        object_geometry = o3d.io.read_point_cloud(ply_model_paths[self._meshes_available.selected_index + 1])
+        object_geometry = o3d.io.read_point_cloud(obj_ply_paths[self._meshes_available.selected_index + 1])
         object_geometry.points = o3d.utility.Vector3dVector(
             np.array(object_geometry.points) / 1000)  # convert mm to meter
         init_trans = np.identity(4)
@@ -699,10 +699,10 @@ class AppWindow:
             scene_data = data[str(image_num)]
             for obj in scene_data:
                 # add object to annotation_scene object
-                obj_geometry = o3d.io.read_point_cloud(ply_model_paths[int(obj['obj_id'])])
+                obj_geometry = o3d.io.read_point_cloud(obj_ply_paths[int(obj['obj_id'])])
                 obj_geometry.points = o3d.utility.Vector3dVector(
                     np.array(obj_geometry.points) / 1000)  # convert mm to meter
-                model_name = model_names[int(obj['obj_id']) - 1]
+                model_name = ycb_model_names[int(obj['obj_id']) - 1]
                 meshes = self._annotation_scene.get_objects()  # update list after adding current object
                 meshes = [i.obj_name for i in meshes]
                 obj_instance = self._obj_instance_count(model_name, meshes)
@@ -733,7 +733,7 @@ class AppWindow:
         obj_ext_poses = {}
         objs = self._annotation_scene.get_objects()
         for obj in objs:
-            obj_id = model_names.index(obj.obj_name[:-2]) + 1
+            obj_id = ycb_model_names.index(obj.obj_name[:-2]) + 1
             pose = obj.transform
             pose = self.extrinsics[self.camera_names[0]] @ pose
             if obj_id in obj_ext_poses:
@@ -763,7 +763,7 @@ class AppWindow:
         print('rgb view updated')
 
     def update_obj_list(self):
-        self._meshes_available.set_items(model_names)
+        self._meshes_available.set_items(ycb_model_names)
 
     def _check_changes(self):
         if self._annotation_changed:
@@ -845,7 +845,7 @@ def main():
     parser = argparse.ArgumentParser(description='Annotation tool.')
     parser.add_argument('--scene_name', default='scene_2210232307_01')
     # parser.add_argument('--scene_name', default='scene_2210232348_wzq')
-    parser.add_argument('--start_frame', type=int, default=366)
+    parser.add_argument('--start_frame', type=int, default=20)
 
     args = parser.parse_args()
     scene_name = args.scene_name
