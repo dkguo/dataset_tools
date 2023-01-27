@@ -8,13 +8,13 @@ import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 
-from dataset_tools.config import dataset_path, ycb_model_names, obj_ply_paths
+from dataset_tools.config import dataset_path, ycb_model_names, obj_ply_paths, resolution_width, resolution_height
 from dataset_tools.loaders import load_intrinsics, get_depth_scale, get_camera_names, load_extrinsics, get_num_frame
 from dataset_tools.view.open3d_window import Open3dWindow
 
 
 class PointCloudWindow(Open3dWindow):
-    def __init__(self, scene_name, init_frame_num, width=640*3+408, height=480*3):
+    def __init__(self, scene_name, init_frame_num, width=640*3+408, height=480*3, mask_dir=None):
         super().__init__(width, height, scene_name, 'Point Cloud')
         self.frame_num = init_frame_num
         self._update_frame_label()
@@ -47,6 +47,20 @@ class PointCloudWindow(Open3dWindow):
             grid.add_child(box)
             self.selected_cameras.append((i, box))
 
+        # mask
+        self.mask_dir = mask_dir
+        self.mask_box = gui.Checkbox(f'Apply Mask')
+        if mask_dir is not None:
+            self.masks = {}
+            view_ctrls.add_child(gui.Label(mask_dir))
+            self.mask_box.set_on_checked(self._update_frame)
+            view_ctrls.add_child(self.mask_box)
+
+            # intersection
+            self.mask_intsct_box = gui.Checkbox(f'Intersect Masks')
+            self.mask_box.set_on_checked(self._update_frame)
+            view_ctrls.add_child(self.mask_intsct_box)
+
         self._update_frame()
 
     def _on_point_size(self, size):
@@ -57,40 +71,49 @@ class PointCloudWindow(Open3dWindow):
     def _set_camera_view(self):
         camera_name = get_camera_names(self.scene_path)[self.active_camera_view]
         intrinsic = load_intrinsics(f'{self.scene_path}/{camera_name}/camera_meta.yml')
-        extrinsics = load_extrinsics(f'{self.scene_path}/cameras_meta.yml')
+        extrinsics = load_extrinsics(f'{self.scene_path}/extrinsics.yml')
         extrinsic = np.linalg.inv(extrinsics[camera_name])
         self.scene_widget.setup_camera(intrinsic, extrinsic, 640, 480, self.bounds)
 
-    def load_pcds(self, frame_num, active_camera_ids):
+    def load_pcds(self):
         pcds = o3d.geometry.PointCloud()
-        for camera_name in np.array(get_camera_names(self.scene_path))[active_camera_ids]:
-            intrinsic = load_intrinsics(f'{self.scene_path}/{camera_name}/camera_meta.yml')
-            extrinsics = load_extrinsics(f'{self.scene_path}/cameras_meta.yml')
-            extrinsic = np.linalg.inv(extrinsics[camera_name])
-            depth_scale = get_depth_scale(f'{self.scene_path}/{camera_name}/camera_meta.yml', convert2unit='m')
+        for camera_name in self._get_selected_camera_names():
+            intrinsic = self.intrinsics[camera_name]
+            extrinsic = self.extrinsics[camera_name]
+            rgb_img = self.rgb_imgs[camera_name]
+            depth_img = self.depth_imgs[camera_name]
 
-            rgb_path = os.path.join(self.scene_path, f'{camera_name}', 'rgb', f'{frame_num:06}' + '.png')
-            rgb_img = cv2.imread(rgb_path)
-            depth_path = os.path.join(self.scene_path, f'{camera_name}', 'depth', f'{frame_num:06}' + '.png')
-            depth_img = cv2.imread(depth_path, -1)
-            depth_img = np.float32(depth_img * depth_scale)
-
-            if self.mask_on:
-                # read mask
-                mask = xx
-                apply_mask on rgb and depth
+            if self.mask_box.checked:
+                mask = self.masks[camera_name]
+                rgb_img = cv2.bitwise_and(rgb_img, rgb_img, mask=mask)
+                depth_img = cv2.bitwise_and(depth_img, depth_img, mask=mask)
 
             pcds += load_pcd_from_rgbd(rgb_img, depth_img, intrinsic, extrinsic)
         return pcds
 
+    def load_masks(self):
+        for camera_name in self.camera_names:
+            mask_path = f'{self.scene_path}/{camera_name}/{self.mask_dir}/{self.frame_num:06}.png'
+            if os.path.exists(mask_path):
+                self.masks[camera_name] = cv2.imread(mask_path, 0)
+            else:
+                self.masks[camera_name] = np.zeros((resolution_height, resolution_width)).astype('uint8')
+
+    def load_conven_hulls_ls(self):
+        for camera_name in self._get_selected_camera_names():
+            intrinsic = self.intrinsics[camera_name]
+            extrinsic = self.extrinsics[camera_name]
+            mask = self.masks[camera_name]
+            if max(mask) == 0:
+                continue
+            hull, hull_ls = compute_convex_hull_line_set_from_mask(mask, intrinsic, extrinsic)
+
+
     def _update_frame(self, arg=None):
         self.scene_widget.scene.clear_geometry()
         self._update_frame_label()
-        active_camera_ids = []
-        for i, box in self.selected_cameras:
-            if box.checked:
-                active_camera_ids.append(i)
-        pcd = self.load_pcds(self.frame_num, active_camera_ids)
+        self.load_images()
+        pcd = self.load_pcds()
         self.bounds = pcd.get_axis_aligned_bounding_box()
         self.scene_widget.scene.add_geometry("pcd", pcd, self.settings.scene_material)
         self._set_camera_view()
@@ -121,6 +144,42 @@ class PointCloudWindow(Open3dWindow):
             else:
                 return gui.Widget.EventCallbackResult.HANDLED
 
+    def _get_selected_camera_names(self):
+        active_camera_ids = []
+        for i, box in self.selected_cameras:
+            if box.checked:
+                active_camera_ids.append(i)
+        return np.array(self.camera_names)[active_camera_ids]
+
+
+def crop_pcd_by_convex_hulls(pcd, convex_hulls):
+    for hull in convex_hulls:
+        pcd = pcd.crop_convex_hull(hull)
+    return pcd
+
+
+def compute_convex_hull_line_set_from_mask(mask, intrinsic, extrinsic, min_d=0.1, max_d=2.0):
+    h, w = mask.shape
+    pts = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    pts = pts[0][0].reshape((-1, 2))
+
+    rgb = np.zeros((h, w, 3)).astype('uint8')
+
+    depth_min = np.zeros((h, w)).astype('float32')
+    depth_min[pts[:, 1], pts[:, 0]] = min_d
+    depth_max = np.zeros((h, w)).astype('float32')
+    depth_max[pts[:, 1], pts[:, 0]] = max_d
+
+    pcd_crop = load_pcd_from_rgbd(rgb, depth_min, intrinsic, extrinsic)
+    pcd_crop += load_pcd_from_rgbd(rgb, depth_max, intrinsic, extrinsic)
+
+    hull, _ = pcd_crop.compute_convex_hull()
+    hull_ls = o3d.geometry.LineSet.create_from_triangle_mesh(hull)
+    hull_ls.paint_uniform_color((1, 0, 0))
+
+    hull = o3d.geometry.BoundingConvexHull(pcd_crop)
+    return hull, hull_ls
+
 
 def load_pcd_from_rgbd(rgb_img, depth_img, cam_K, extrinsic):
     rgb_img_o3d = o3d.geometry.Image(cv2.cvtColor(rgb_img, cv2.COLOR_BGR2RGB))
@@ -136,15 +195,18 @@ def load_pcd_from_rgbd(rgb_img, depth_img, cam_K, extrinsic):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scene_name', default='scene_2211192313')
+    # parser.add_argument('--scene_name', default='scene_2211192313')
+    parser.add_argument('--scene_name', default='scene_2210232307_01')
     parser.add_argument('--start_frame', type=int, default=50)
+    parser.add_argument('--mask_dir', default='hand_pose/d2/mask')
 
     args = parser.parse_args()
     scene_name = args.scene_name
     start_image_num = args.start_frame
+    mask_dir = args.mask_dir
 
     gui.Application.instance.initialize()
-    PointCloudWindow(scene_name, start_image_num)
+    PointCloudWindow(scene_name, start_image_num, mask_dir=mask_dir)
     gui.Application.instance.run()
 
 

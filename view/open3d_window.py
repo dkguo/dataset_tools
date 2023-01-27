@@ -8,7 +8,7 @@ import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 
 from dataset_tools.config import dataset_path
-from dataset_tools.loaders import get_camera_names
+from dataset_tools.loaders import get_camera_names, load_intrinsics, load_extrinsics, get_depth_scale
 
 
 class Settings:
@@ -37,6 +37,17 @@ class Open3dWindow:
         self.active_camera_view = 0
         self.camera_names = get_camera_names(self.scene_path)
         self.frame_num = 0
+
+        # load camera info
+        self.intrinsics = {}
+        self.extrinsics = load_extrinsics(f'{self.scene_path}/extrinsics.yml')
+        self.depth_scale = get_depth_scale(f'{self.scene_path}/{self.camera_names[0]}/camera_meta.yml', convert2unit='m')
+        for camera_name in self.camera_names:
+            self.intrinsics[camera_name] = load_intrinsics(f'{self.scene_path}/{camera_name}/camera_meta.yml')
+            self.extrinsics[camera_name] = np.linalg.inv(self.extrinsics[camera_name])
+
+        self.rgb_imgs = {}
+        self.depth_imgs = {}
 
         self.settings = Settings()
         self.window = gui.Application.instance.create_window(window_name, width, height)
@@ -82,6 +93,14 @@ class Open3dWindow:
         h.add_stretch()
         self._scene_control.add_child(h)
         self.scene_widget.set_on_key(self._transform)
+
+    def load_images(self):
+        for camera_name in np.array(self.camera_names):
+            rgb_path = os.path.join(self.scene_path, f'{camera_name}', 'rgb', f'{self.frame_num:06}' + '.png')
+            self.rgb_imgs[camera_name] = cv2.imread(rgb_path)
+            depth_path = os.path.join(self.scene_path, f'{camera_name}', 'depth', f'{self.frame_num:06}' + '.png')
+            depth_img = cv2.imread(depth_path, -1)
+            self.depth_imgs[camera_name] = np.float32(depth_img * self.depth_scale)
 
     def _on_layout(self, layout_context):
         r = self.window.content_rect
