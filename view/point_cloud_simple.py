@@ -4,6 +4,7 @@ import os
 
 import cv2
 import numpy as np
+# from dataset_tools.view.open3ddev.geometry import BoundingConvexHull
 import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
@@ -58,7 +59,7 @@ class PointCloudWindow(Open3dWindow):
 
             # intersection
             self.mask_intsct_box = gui.Checkbox(f'Intersect Masks')
-            self.mask_box.set_on_checked(self._update_frame)
+            self.mask_intsct_box.set_on_checked(self._update_frame)
             view_ctrls.add_child(self.mask_intsct_box)
 
         self._update_frame()
@@ -100,23 +101,36 @@ class PointCloudWindow(Open3dWindow):
                 self.masks[camera_name] = np.zeros((resolution_height, resolution_width)).astype('uint8')
 
     def load_conven_hulls_ls(self):
+        hulls = []
+        hull_lss = []
         for camera_name in self._get_selected_camera_names():
             intrinsic = self.intrinsics[camera_name]
             extrinsic = self.extrinsics[camera_name]
             mask = self.masks[camera_name]
-            if max(mask) == 0:
+            if mask.max() == 0:
                 continue
             hull, hull_ls = compute_convex_hull_line_set_from_mask(mask, intrinsic, extrinsic)
-
+            hulls.append(hull)
+            hull_lss.append(hull_ls)
+        return hulls, hull_lss
 
     def _update_frame(self, arg=None):
         self.scene_widget.scene.clear_geometry()
         self._update_frame_label()
         self.load_images()
+        self.load_masks()
         pcd = self.load_pcds()
+        print('loaded pcd')
+
+        if self.mask_intsct_box.checked:
+            convex_hulls, hull_lss = self.load_conven_hulls_ls()
+            pcd = crop_pcd_by_convex_hulls(pcd, convex_hulls)
+            for i, hull_ls in enumerate(hull_lss):
+                self.scene_widget.scene.add_geometry(f"hull_{i}", hull_ls, self.settings.scene_material)
+
         self.bounds = pcd.get_axis_aligned_bounding_box()
         self.scene_widget.scene.add_geometry("pcd", pcd, self.settings.scene_material)
-        self._set_camera_view()
+        # self._set_camera_view()
 
     def _on_next_frame(self):
         self.frame_num = min(get_num_frame(self.scene_path), self.frame_num + 1)
@@ -137,7 +151,8 @@ class PointCloudWindow(Open3dWindow):
                 if view_id < len(self.camera_names):
                     print(f'Change to camera_{view_id + 1:02d}')
                     self.active_camera_view = view_id
-                    self._update_frame()
+                    # self._update_frame()
+                    self._set_camera_view()
                     return gui.Widget.EventCallbackResult.HANDLED
                 else:
                     return gui.Widget.EventCallbackResult.HANDLED
