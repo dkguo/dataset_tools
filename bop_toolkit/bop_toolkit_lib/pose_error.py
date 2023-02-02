@@ -27,7 +27,7 @@ def vsd(R_est, t_est, R_gt, t_gt, depth_test, K, delta, taus,
   :param t_gt: 3x1 ndarray with the ground-truth translation vector.
   :param depth_test: hxw ndarray with the test depth image.
   :param K: 3x3 ndarray with an intrinsic camera matrix.
-  :param delta: Tolerance used for estimation of the visibility masks.
+  :param delta: Tolerance used for estimation of the visibility hand_masks.
   :param taus: A list of misalignment tolerance values.
   :param normalized_by_diameter: Whether to normalize the pixel-wise distances
       by the object diameter.
@@ -60,7 +60,7 @@ def vsd(R_est, t_est, R_gt, t_gt, depth_test, K, delta, taus,
   visib_est = visibility.estimate_visib_mask_est(
     dist_test, dist_est, visib_gt, delta, visib_mode='bop19')
 
-  # Intersection and union of the visibility masks.
+  # Intersection and union of the visibility hand_masks.
   visib_inter = np.logical_and(visib_gt, visib_est)
   visib_union = np.logical_or(visib_gt, visib_est)
 
@@ -236,7 +236,7 @@ def proj(R_est, t_est, R_gt, t_gt, K, pts):
 
 
 def cou_mask(mask_est, mask_gt):
-  """Complement over Union of 2D binary masks.
+  """Complement over Union of 2D binary hand_masks.
 
   :param mask_est: hxw ndarray with the estimated mask.
   :param mask_gt: hxw ndarray with the ground-truth mask.
@@ -257,7 +257,7 @@ def cou_mask(mask_est, mask_gt):
 
 
 def cus(R_est, t_est, R_gt, t_gt, K, renderer, obj_id):
-  """Complement over Union of projected 2D masks.
+  """Complement over Union of projected 2D hand_masks.
 
   :param R_est: 3x3 ndarray with the estimated rotation matrix.
   :param t_est: 3x1 ndarray with the estimated translation vector.

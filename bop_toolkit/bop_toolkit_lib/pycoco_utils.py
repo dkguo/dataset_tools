@@ -220,11 +220,11 @@ def rle_to_binary_mask(rle):
 
 def compute_ious(gt, dt, iou_type):
     """
-    Compute the Intersection over Union between masks in RLE format
+    Compute the Intersection over Union between hand_masks in RLE format
     :param gt: Masks in RLE format
     :param dt: Masks in RLE format
     :param iou_type: Can be 'segm' or 'bbox'
-    :return: matrix of ious between all gt and dt masks
+    :return: matrix of ious between all gt and dt hand_masks
     """
      
     if iou_type == 'segm':

@@ -15,19 +15,23 @@ class Settings:
     UNLIT = "defaultUnlit"
 
     def __init__(self):
-        self.bg_color = gui.Color(1, 1, 1)
-        self.show_axes = False
-        self.highlight_obj = True
+        # self.bg_color = gui.Color(1, 1, 1)
+        # self.show_axes = False
+        # self.highlight_obj = True
+        #
+        # self.apply_material = True  # clear to False after processing
 
-        self.apply_material = True  # clear to False after processing
+        self.pcd_material = rendering.MaterialRecord()
+        self.pcd_material.base_color = [0.9, 0.9, 0.9, 1.0]
+        self.pcd_material.shader = Settings.UNLIT
 
-        self.scene_material = rendering.MaterialRecord()
-        self.scene_material.base_color = [0.9, 0.9, 0.9, 1.0]
-        self.scene_material.shader = Settings.UNLIT
+        self.obj_material = rendering.MaterialRecord()
+        self.obj_material.base_color = [0, 1, 0, 1.0]
+        self.obj_material.shader = Settings.UNLIT
 
-        self.annotation_obj_material = rendering.MaterialRecord()
-        self.annotation_obj_material.base_color = [0.9, 0.3, 0.3, 1.0]
-        self.annotation_obj_material.shader = Settings.UNLIT
+        self.line_set_material = rendering.MaterialRecord()
+        self.line_set_material.shader = "unlitLine"
+        self.line_set_material.line_width = 1
 
 
 class Open3dWindow:
@@ -92,7 +96,7 @@ class Open3dWindow:
         h.add_child(self._next_frame_button)
         h.add_stretch()
         self._scene_control.add_child(h)
-        self.scene_widget.set_on_key(self._transform)
+        self.scene_widget.set_on_key(self._on_keyboard_input)
 
     def load_images(self):
         for camera_name in np.array(self.camera_names):
@@ -105,7 +109,7 @@ class Open3dWindow:
     def _on_layout(self, layout_context):
         r = self.window.content_rect
         width = 17 * layout_context.theme.font_size
-        height = min(r.height,
+        height = max(r.height,
                      self._settings_panel.calc_preferred_size(layout_context, gui.Widget.Constraints()).height)
         self._settings_panel.frame = gui.Rect(r.get_right() - width, r.y, width, height)
         self.scene_widget.frame = gui.Rect(0, r.y, r.get_right() - width, r.height)
@@ -119,7 +123,7 @@ class Open3dWindow:
     def _update_frame_label(self):
         self._frame_label.text = f"Frame: {self.frame_num:06}"
 
-    def _transform(self, event):
+    def _on_keyboard_input(self, event):
         pass
 
 

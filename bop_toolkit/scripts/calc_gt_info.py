@@ -32,7 +32,7 @@ p = {
   # Dataset split type. None = default. See dataset_params.py for options.
   'dataset_split_type': None,
 
-  # Whether to save visualizations of visibility masks.
+  # Whether to save visualizations of visibility hand_masks.
   'vis_visibility_masks': False,
 
   # Tolerance used in the visibility test [mm].
@@ -44,7 +44,7 @@ p = {
   # Folder containing the BOP datasets.
   'datasets_path': config.datasets_path,
 
-  # Path template for output images with object masks.
+  # Path template for output images with object hand_masks.
   'vis_mask_visib_tpath': os.path.join(
     config.output_path, 'vis_gt_visib_delta={delta}',
     'vis_gt_visib_delta={delta}', '{dataset}', '{split}', '{scene_id:06d}',
@@ -69,7 +69,7 @@ dp_model = dataset_params.get_model_params(
 # Initialize a renderer.
 misc.log('Initializing renderer...')
 
-# The renderer has a larger canvas for generation of masks of truncated objects.
+# The renderer has a larger canvas for generation of hand_masks of truncated objects.
 im_width, im_height = dp_split['im_size']
 ren_width, ren_height = 3 * im_width, 3 * im_height
 ren_cx_offset, ren_cy_offset = im_width, im_height

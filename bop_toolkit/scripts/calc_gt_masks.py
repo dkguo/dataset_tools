@@ -1,7 +1,7 @@
 # Author: Tomas Hodan (hodantom@cmp.felk.cvut.cz)
 # Center for Machine Perception, Czech Technical University in Prague
 
-"""Calculates masks of object models in the ground-truth poses."""
+"""Calculates hand_masks of object models in the ground-truth poses."""
 
 import os
 import numpy as np
@@ -61,7 +61,7 @@ for scene_id in scene_ids:
     scene_id=scene_id)
   scene_camera = inout.load_scene_camera(scene_camera_path)
 
-  # Create folders for the output masks (if they do not exist yet).
+  # Create folders for the output hand_masks (if they do not exist yet).
   mask_dir_path = os.path.dirname(
     dp_split['mask_tpath'].format(
       scene_id=scene_id, im_id=0, gt_id=0))
@@ -87,7 +87,7 @@ for scene_id in scene_ids:
 
     if im_id % 100 == 0:
       misc.log(
-        'Calculating masks - dataset: {} ({}, {}), scene: {}, im: {}'.format(
+        'Calculating hand_masks - dataset: {} ({}, {}), scene: {}, im: {}'.format(
           p['dataset'], p['dataset_split'], p['dataset_split_type'], scene_id,
           im_id))
 
@@ -117,7 +117,7 @@ for scene_id in scene_ids:
       mask_visib = visibility.estimate_visib_mask_gt(
         dist_im, dist_gt, p['delta'], visib_mode='bop19')
 
-      # Save the calculated masks.
+      # Save the calculated hand_masks.
       mask_path = dp_split['mask_tpath'].format(
         scene_id=scene_id, im_id=im_id, gt_id=gt_id)
       inout.save_im(mask_path, 255 * mask.astype(np.uint8))
