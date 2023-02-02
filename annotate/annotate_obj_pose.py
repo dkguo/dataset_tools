@@ -587,7 +587,7 @@ class AppWindow:
             print('no obj selected')
             return
 
-        object_geometry = o3d.io.read_point_cloud(obj_ply_paths[self._meshes_available.selected_index + 1])
+        object_geometry = o3d.io.read_point_cloud(list(obj_ply_paths.values())[self._meshes_available.selected_index + 1])
         object_geometry.points = o3d.utility.Vector3dVector(
             np.array(object_geometry.points) / 1000)  # convert mm to meter
         init_trans = np.identity(4)
@@ -743,16 +743,16 @@ class AppWindow:
 
         imgs = []
         for i, camera_name in enumerate(self.camera_names):
-            if len(objs) > 0:
-                # change pose to corresponding camera view
-                dict_id_poses = {}
-                for obj_id, pose in obj_ext_poses.items():
-                    dict_id_poses[obj_id] = np.linalg.inv(self.extrinsics[camera_name]) @ pose
-
-                py_rendered_im = render_obj_pose(self.py_renderers[i], dict_id_poses)
-                im = overlay_imgs(self.rgb_imgs[i], py_rendered_im, 1, 0.8)
-            else:
-                im = self.rgb_imgs[i]
+            # if len(objs) > 0:
+            #     # change pose to corresponding camera view
+            #     dict_id_poses = {}
+            #     for obj_id, pose in obj_ext_poses.items():
+            #         dict_id_poses[obj_id] = np.linalg.inv(self.extrinsics[camera_name]) @ pose
+            #
+            #     py_rendered_im = render_obj_pose(self.py_renderers[i], dict_id_poses)
+            #     im = overlay_imgs(self.rgb_imgs[i], py_rendered_im, 1, 0.8)
+            # else:
+            im = self.rgb_imgs[i]
             im = cv2.putText(im, camera_name[:9], (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), thickness=2)
             if i == self.active_camera_view:
                 im = add_border(im)
