@@ -19,74 +19,64 @@ from dataset_tools.view.open3d_window import Open3dWindow
 
 class PointCloudWindow(Open3dWindow):
     def __init__(self, scene_name, init_frame_num, width=640*3+408, height=480*3, hand_mask_dir=None, obj_pose_file=None):
-        super().__init__(width, height, scene_name, 'Point Cloud')
+        super().__init__(width, height, scene_name, 'Point Cloud', init_frame_num, obj_pose_file=obj_pose_file)
         self.frame_num = init_frame_num
-        self._update_frame_label()
+        self.update_frame_label()
         em = self.window.theme.font_size
 
-        # view control
-        view_ctrls = gui.CollapsableVert("View", 0, gui.Margins(em, 0, 0, 0))
-        view_ctrls.set_is_open(True)
-        self._settings_panel.add_child(view_ctrls)
+        self.scene_widget = gui.SceneWidget()
+        self.scene_widget.scene = rendering.Open3DScene(self.window.renderer)
+        self.window.add_child(self.scene_widget)
+        self.scene_widget.set_on_key(self.on_keyboard_input)
 
-        # pcd point size
-        self._point_size = gui.Slider(gui.Slider.INT)
-        self._point_size.set_limits(1, 5)
-        self._point_size.set_on_value_changed(self._on_point_size)
-        self._point_size.double_value = self.settings.pcd_material.point_size
-        grid = gui.VGrid(1, 0.25 * em)
-        grid.add_child(gui.Label("Point size"))
-        grid.add_child(self._point_size)
-        view_ctrls.add_child(grid)
-
-        # select camera views
-        view_ctrls.add_child(gui.Label("Active Cameras"))
-        self.selected_cameras = []
-        grid = gui.VGrid(2, 0.25 * em)
-        view_ctrls.add_child(grid)
-        for i in [0, 4, 1, 5, 2, 6, 3, 7]:
-            box = gui.Checkbox(f'camera {i+1:02d}')
-            box.checked = True
-            box.set_on_checked(self._update_frame)
-            grid.add_child(box)
-            self.selected_cameras.append((i, box))
+        self.window.set_on_layout(self.on_layout)
 
         # mask
         self.hand_mask_dir = hand_mask_dir
         self.hand_mask_box = gui.Checkbox(f'Apply Masks')
         if hand_mask_dir is not None:
             self.hand_masks = {}
-            view_ctrls.add_child(gui.Label(hand_mask_dir))
-            self.hand_mask_box.set_on_checked(self._update_frame)
-            view_ctrls.add_child(self.hand_mask_box)
+            self.view_ctrls.add_child(gui.Label(hand_mask_dir))
+            self.hand_mask_box.set_on_checked(self.update_frame)
+            self.view_ctrls.add_child(self.hand_mask_box)
 
             # intersection
             self.hand_mask_intsct_box = gui.Checkbox(f'Intersect Masks')
-            self.hand_mask_intsct_box.set_on_checked(self._update_frame)
-            view_ctrls.add_child(self.hand_mask_intsct_box)
+            self.hand_mask_intsct_box.set_on_checked(self.update_frame)
+            self.view_ctrls.add_child(self.hand_mask_intsct_box)
             self.hand_mask_intsct_convex_hull_box = gui.Checkbox(f'Show convex hull')
-            self.hand_mask_intsct_convex_hull_box.set_on_checked(self._update_frame)
-            view_ctrls.add_child(self.hand_mask_intsct_convex_hull_box)
-        
-        # obj poses
-        self.obj_pose_file = obj_pose_file
-        self.obj_pose_box = gui.Checkbox(f'Objects')
-        if obj_pose_file is not None:
-            self.opt = load_object_pose_table(f"{self.scene_path}/{self.camera_names[0]}/{obj_pose_file}",
-                                              only_valid_pose=True)
-            view_ctrls.add_child(gui.Label(obj_pose_file))
-            self.obj_pose_box.set_on_checked(self._update_frame)
-            view_ctrls.add_child(self.obj_pose_box)
+            self.hand_mask_intsct_convex_hull_box.set_on_checked(self.update_frame)
+            self.view_ctrls.add_child(self.hand_mask_intsct_convex_hull_box)
+            self.view_ctrls.add_child(gui.Label(""))
 
-        self._update_frame()
-        self._set_camera_view()
+        # select camera views
+        self.view_ctrls.add_child(gui.Label("Active Cameras"))
+        self.selected_cameras = []
+        grid = gui.VGrid(2, 0.25 * em)
+        self.view_ctrls.add_child(grid)
+        for i in [0, 4, 1, 5, 2, 6, 3, 7]:
+            box = gui.Checkbox(f'camera {i+1:02d}')
+            box.checked = True
+            box.set_on_checked(self.update_frame)
+            grid.add_child(box)
+            self.selected_cameras.append((i, box))
 
-    def _on_point_size(self, size):
+        self.update_frame()
+        self.set_camera_view()
+
+    def on_layout(self, layout_context):
+        r = self.window.content_rect
+        width = 17 * layout_context.theme.font_size
+        height = max(r.height,
+                     self.settings_panel.calc_preferred_size(layout_context, gui.Widget.Constraints()).height)
+        self.settings_panel.frame = gui.Rect(r.get_right() - width, r.y, width, height)
+        self.scene_widget.frame = gui.Rect(0, r.y, r.get_right() - width, r.height)
+
+    def on_point_size(self, size):
         self.settings.pcd_material.point_size = int(size)
-        self.settings.apply_material = True
         self.scene_widget.scene.modify_geometry_material("pcd", self.settings.pcd_material)
 
-    def _set_camera_view(self):
+    def set_camera_view(self):
         camera_name = get_camera_names(self.scene_path)[self.active_camera_view]
         intrinsic = load_intrinsics(f'{self.scene_path}/{camera_name}/camera_meta.yml')
         extrinsics = load_extrinsics(f'{self.scene_path}/extrinsics.yml')
@@ -95,7 +85,7 @@ class PointCloudWindow(Open3dWindow):
 
     def load_pcds(self):
         pcds = o3d.geometry.PointCloud()
-        for camera_name in self._get_selected_camera_names():
+        for camera_name in self.get_selected_camera_names():
             intrinsic = self.intrinsics[camera_name]
             extrinsic = self.extrinsics[camera_name]
             rgb_img = self.rgb_imgs[camera_name]
@@ -116,26 +106,11 @@ class PointCloudWindow(Open3dWindow):
                 self.hand_masks[camera_name] = cv2.imread(mask_path, 0)
             else:
                 self.hand_masks[camera_name] = np.zeros((resolution_height, resolution_width)).astype('uint8')
-    
-    def load_obj_meshes(self):
-        obj_id_meshes = []
-        for t in self.opt[self.opt['frame'] == self.frame_num]:
-            obj_id = t['obj_id']
-            if obj_id == 26:
-                continue
-            geometry = o3d.io.read_point_cloud(obj_ply_paths[obj_id])
-            pose = t['pose']
-            geometry.translate(pose[0:3, 3])
-            center = geometry.get_center()
-            geometry.rotate(pose[0:3, 0:3], center=center)
-            geometry.points = o3d.utility.Vector3dVector(np.array(geometry.points) / 1000)
-            obj_id_meshes.append((obj_id, geometry))
-        return obj_id_meshes
 
     def load_convex_hulls_ls(self):
         hulls = []
         hull_lss = []
-        for camera_name in self._get_selected_camera_names():
+        for camera_name in self.get_selected_camera_names():
             intrinsic = self.intrinsics[camera_name]
             extrinsic = self.extrinsics[camera_name]
             mask = self.hand_masks[camera_name]
@@ -147,9 +122,9 @@ class PointCloudWindow(Open3dWindow):
                 hull_lss.append(hull_ls)
         return hulls, hull_lss
 
-    def _update_frame(self, arg=None):
+    def update_frame(self, arg=None):
         self.scene_widget.scene.clear_geometry()
-        self._update_frame_label()
+        self.update_frame_label()
         self.load_images()
         self.load_hand_masks()
         pcd = self.load_pcds()
@@ -174,15 +149,7 @@ class PointCloudWindow(Open3dWindow):
         if self.hand_mask_intsct_box.checked and self.obj_pose_box.checked and len(convex_hulls) > 0:
             calculate_hand_obj_distance(pcd, self.obj_id_meshes)
 
-    def _on_next_frame(self):
-        self.frame_num = min(get_num_frame(self.scene_path), self.frame_num + 1)
-        self._update_frame()
-
-    def _on_previous_frame(self):
-        self.frame_num = max(0, self.frame_num - 1)
-        self._update_frame()
-
-    def _on_keyboard_input(self, event):
+    def on_keyboard_input(self, event):
         if event.is_repeat:
             return gui.Widget.EventCallbackResult.HANDLED
 
@@ -193,12 +160,12 @@ class PointCloudWindow(Open3dWindow):
                 if view_id < len(self.camera_names):
                     print(f'Change to camera_{view_id + 1:02d}')
                     self.active_camera_view = view_id
-                    self._set_camera_view()
+                    self.set_camera_view()
                     return gui.Widget.EventCallbackResult.HANDLED
 
         return gui.Widget.EventCallbackResult.HANDLED
 
-    def _get_selected_camera_names(self):
+    def get_selected_camera_names(self):
         active_camera_ids = []
         for i, box in self.selected_cameras:
             if box.checked:

@@ -3,30 +3,24 @@ import os
 
 import cv2
 import numpy as np
+import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 
-from dataset_tools.config import dataset_path
-from dataset_tools.loaders import get_camera_names, load_intrinsics, load_extrinsics, get_depth_scale
+from dataset_tools.config import dataset_path, obj_ply_paths
+from dataset_tools.loaders import get_camera_names, load_intrinsics, load_extrinsics, get_depth_scale, \
+    load_object_pose_table, get_num_frame
 
 
 class Settings:
-    UNLIT = "defaultUnlit"
-
     def __init__(self):
-        # self.bg_color = gui.Color(1, 1, 1)
-        # self.show_axes = False
-        # self.highlight_obj = True
-        #
-        # self.apply_material = True  # clear to False after processing
-
         self.pcd_material = rendering.MaterialRecord()
         self.pcd_material.base_color = [0.9, 0.9, 0.9, 1.0]
-        self.pcd_material.shader = Settings.UNLIT
+        self.pcd_material.shader = "defaultUnlit"
 
         self.obj_material = rendering.MaterialRecord()
         self.obj_material.base_color = [0, 1, 0, 1.0]
-        self.obj_material.shader = Settings.UNLIT
+        self.obj_material.shader = "defaultUnlit"
 
         self.line_set_material = rendering.MaterialRecord()
         self.line_set_material.shader = "unlitLine"
@@ -34,12 +28,12 @@ class Settings:
 
 
 class Open3dWindow:
-    def __init__(self, width, height, scene_name, window_name):
+    def __init__(self, width, height, scene_name, window_name, init_frame_num=0, obj_pose_file=None):
         self.scene_name = scene_name
         self.scene_path = f'{dataset_path}/{scene_name}'
         self.active_camera_view = 0
         self.camera_names = get_camera_names(self.scene_path)
-        self.frame_num = 0
+        self.frame_num = init_frame_num
 
         # load camera info
         self.intrinsics = {}
@@ -54,48 +48,71 @@ class Open3dWindow:
 
         self.settings = Settings()
         self.window = gui.Application.instance.create_window(window_name, width, height)
-        self.scene_widget = gui.SceneWidget()
-        self.scene_widget.scene = rendering.Open3DScene(self.window.renderer)
-        self.window.add_child(self.scene_widget)
 
-        w = self.window
-        em = w.theme.font_size
+        em = self.window.theme.font_size
 
         # Settings panel
-        self._settings_panel = gui.Vert(0, gui.Margins(0.25 * em, 0.25 * em, 0.25 * em, 0.25 * em))
-        w.set_on_layout(self._on_layout)
-        w.add_child(self._settings_panel)
+        self.settings_panel = gui.Vert(0, gui.Margins(0.25 * em, 0.25 * em, 0.25 * em, 0.25 * em))
+        self.window.add_child(self.settings_panel)
 
         # Scene control
-        self._scene_control = gui.CollapsableVert("Scene", 0.33 * em, gui.Margins(em, 0, 0, 0))
-        self._scene_control.set_is_open(True)
-        self._settings_panel.add_child(self._scene_control)
+        self.scene_control = gui.CollapsableVert("Scene", 0.33 * em, gui.Margins(em, 0, 0, 0))
+        self.scene_control.set_is_open(True)
+        self.settings_panel.add_child(self.scene_control)
 
         # display scene name
-        self._scene_label = gui.Label(self.scene_name)
-        self._scene_control.add_child(self._scene_label)
+        self.scene_label = gui.Label(self.scene_name)
+        self.scene_control.add_child(self.scene_label)
 
         # display frame number
-        self._frame_label = gui.Label('')
-        self._update_frame_label()
-        self._scene_control.add_child(self._frame_label)
+        self.frame_label = gui.Label('')
+        self.update_frame_label()
+        self.scene_control.add_child(self.frame_label)
 
         # frame navigation
-        self._pre_frame_button = gui.Button("Previous frame")
-        self._pre_frame_button.horizontal_padding_em = 0.8
-        self._pre_frame_button.vertical_padding_em = 0
-        self._pre_frame_button.set_on_clicked(self._on_previous_frame)
-        self._next_frame_button = gui.Button("Next frame")
-        self._next_frame_button.horizontal_padding_em = 0.8
-        self._next_frame_button.vertical_padding_em = 0
-        self._next_frame_button.set_on_clicked(self._on_next_frame)
+        self.pre_frame_button = gui.Button("Previous frame")
+        self.pre_frame_button.horizontal_padding_em = 0.8
+        self.pre_frame_button.vertical_padding_em = 0
+        self.pre_frame_button.set_on_clicked(self.on_previous_frame)
+        self.next_frame_button = gui.Button("Next frame")
+        self.next_frame_button.horizontal_padding_em = 0.8
+        self.next_frame_button.vertical_padding_em = 0
+        self.next_frame_button.set_on_clicked(self.on_next_frame)
         h = gui.Horiz(0.4 * em)
         h.add_stretch()
-        h.add_child(self._pre_frame_button)
-        h.add_child(self._next_frame_button)
+        h.add_child(self.pre_frame_button)
+        h.add_child(self.next_frame_button)
         h.add_stretch()
-        self._scene_control.add_child(h)
-        self.scene_widget.set_on_key(self._on_keyboard_input)
+        self.scene_control.add_child(h)
+        self.scene_control.add_child(gui.VGrid(1, em))
+
+        # View control
+        self.view_ctrls = gui.CollapsableVert("View", 0, gui.Margins(em, 0, 0, 0))
+        self.view_ctrls.set_is_open(True)
+        self.settings_panel.add_child(self.view_ctrls)
+
+        # pcd point size
+        self.point_size = gui.Slider(gui.Slider.INT)
+        self.point_size.set_limits(1, 5)
+        self.point_size.set_on_value_changed(self.on_point_size)
+        self.point_size.double_value = self.settings.pcd_material.point_size
+        grid = gui.VGrid(1, 0.25 * em)
+        grid.add_child(gui.Label("Point size"))
+        grid.add_child(self.point_size)
+        self.view_ctrls.add_child(grid)
+        self.view_ctrls.add_child(gui.Label(""))
+
+        # obj poses
+        self.obj_pose_file = obj_pose_file
+        self.obj_pose_box = gui.Checkbox(f'Objects')
+        if obj_pose_file is not None:
+            self.opt = load_object_pose_table(f"{self.scene_path}/{self.camera_names[0]}/{obj_pose_file}",
+                                              only_valid_pose=True)
+            self.view_ctrls.add_child(gui.Label(obj_pose_file))
+            self.obj_pose_box.set_on_checked(self.update_frame)
+            self.view_ctrls.add_child(self.obj_pose_box)
+            self.view_ctrls.add_child(gui.Label(""))
+            self.obj_id_meshes = []
 
     def load_images(self):
         for camera_name in np.array(self.camera_names):
@@ -105,25 +122,37 @@ class Open3dWindow:
             depth_img = cv2.imread(depth_path, -1)
             self.depth_imgs[camera_name] = np.float32(depth_img * self.depth_scale)
 
-    def _on_layout(self, layout_context):
-        r = self.window.content_rect
-        width = 17 * layout_context.theme.font_size
-        height = max(r.height,
-                     self._settings_panel.calc_preferred_size(layout_context, gui.Widget.Constraints()).height)
-        self._settings_panel.frame = gui.Rect(r.get_right() - width, r.y, width, height)
-        self.scene_widget.frame = gui.Rect(0, r.y, r.get_right() - width, r.height)
+    def on_next_frame(self):
+        self.frame_num = min(get_num_frame(self.scene_path), self.frame_num + 1)
+        self.update_frame()
 
-    def _on_previous_frame(self):
+    def on_previous_frame(self):
+        self.frame_num = max(0, self.frame_num - 1)
+        self.update_frame()
+
+    def update_frame_label(self):
+        self.frame_label.text = f"Frame: {self.frame_num:06}"
+
+    def on_point_size(self, size):
         pass
 
-    def _on_next_frame(self):
+    def update_frame(self, args=None):
         pass
 
-    def _update_frame_label(self):
-        self._frame_label.text = f"Frame: {self.frame_num:06}"
-
-    def _on_keyboard_input(self, event):
-        pass
+    def load_obj_meshes(self):
+        obj_id_meshes = []
+        for t in self.opt[self.opt['frame'] == self.frame_num]:
+            obj_id = t['obj_id']
+            if obj_id == 26:
+                continue
+            geometry = o3d.io.read_point_cloud(obj_ply_paths[obj_id])
+            pose = t['pose']
+            geometry.translate(pose[0:3, 3])
+            center = geometry.get_center()
+            geometry.rotate(pose[0:3, 0:3], center=center)
+            geometry.points = o3d.utility.Vector3dVector(np.array(geometry.points) / 1000)
+            obj_id_meshes.append((obj_id, geometry))
+        return obj_id_meshes
 
 
 if __name__ == "__main__":

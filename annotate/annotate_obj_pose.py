@@ -249,7 +249,7 @@ class AppWindow:
         # refine_position.set_on_clicked(self._on_refine)
         generate_save_annotation = gui.Button("generate annotation - save/update")
         generate_save_annotation.set_on_clicked(self._on_generate)
-        # self._scene_control.add_child(refine_position)
+        # self.scene_control.add_child(refine_position)
         self._scene_control.add_child(generate_save_annotation)
 
         fill_annotation = gui.Button("Fill previous empty annotation")
