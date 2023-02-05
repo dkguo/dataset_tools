@@ -5,7 +5,7 @@ import open3d as o3d
 
 from open3d.visualization import gui, rendering
 
-from dataset_tools.config import ycb_model_names
+from dataset_tools.config import ycb_model_names, obj_model_names
 from dataset_tools.loaders import load_intrinsics, load_extrinsics
 from dataset_tools.view.open3d_window import Open3dWindow
 from dataset_tools.view.point_cloud_simple import load_pcd_from_rgbd, PointCloudWindow
@@ -16,17 +16,19 @@ class Annotation(Open3dWindow):
         super().__init__(width, height, scene_name, 'Point Cloud', init_frame_num, obj_pose_file=obj_pose_file)
         em = self.window.theme.font_size
 
+        self.obj_pose_box.checked = True
+
         self.objects = gui.CollapsableVert("Objects", 0.33 * em, gui.Margins(em, 0, 0, 0))
         self.objects.set_is_open(True)
         self.meshes_available = gui.ListView()
         self.meshes_available.set_max_visible_items(10)
         self.meshes_available.set_items(ycb_model_names)
         self.meshes_used = gui.ListView()
-        self.meshes_used.set_max_visible_items(10)
+        self.meshes_used.set_max_visible_items(5)
         self.add_mesh_button = gui.Button("Add Mesh")
         self.remove_mesh_button = gui.Button("Remove Mesh")
-        # self.add_mesh_button.set_on_clicked(self.add_mesh)
-        # self.remove_mesh_button.set_on_clicked(self.remove_mesh)
+        self.add_mesh_button.set_on_clicked(self.on_add_mesh)
+        self.remove_mesh_button.set_on_clicked(self.on_remove_mesh)
         self.objects.add_child(self.meshes_available)
         self.objects.add_child(self.add_mesh_button)
         self.objects.add_child(self.meshes_used)
@@ -81,9 +83,6 @@ class Annotation(Open3dWindow):
 
         pcds = self.load_pcds()
 
-        if self.obj_pose_box.checked:
-            self.obj_id_meshes = self.load_obj_meshes()
-
         for i, camera_name in enumerate(self.camera_names):
             self.scene_widgets[i].scene.clear_geometry()
             self.scene_widgets[i].scene.add_geometry("pcd", pcds[i], self.settings.pcd_material)
@@ -93,8 +92,42 @@ class Annotation(Open3dWindow):
             self.scene_widgets[i].setup_camera(intrinsic, extrinsic, 640, 480, bounds)
 
             if self.obj_pose_box.checked:
-                for obj_id, mesh in self.obj_id_meshes:
+                obj_ids = self.opt[self.opt['frame'] == self.frame_num]['obj_id']
+                for obj_id in obj_ids:
+                    mesh = self.load_obj_mesh(obj_id)
                     self.scene_widgets[i].scene.add_geometry(str(obj_id), mesh, self.settings.obj_material)
+                self.meshes_used.set_items([obj_model_names[i] for i in obj_ids])
+            else:
+                self.meshes_used.set_items([])
+
+    def on_add_mesh(self):
+        if self.meshes_available.selected_index == -1:
+            print('no obj selected')
+            return
+
+        obj_id = int(self.meshes_available.selected_value[:3])
+
+        if obj_id in self.opt[self.opt['frame'] == self.frame_num]['obj_id']:
+            print(f'{obj_model_names[obj_id]} already exists')
+            return
+
+        self.opt = np.append(self.opt, self.opt[-1])
+        self.opt[-1]['frame'] = self.frame_num
+        self.opt[-1]['obj_id'] = obj_id
+
+        print(f'{obj_model_names[obj_id]} added')
+        self.update_frame()
+
+    def on_remove_mesh(self):
+        if self.meshes_used.selected_index == -1:
+            print('no obj selected')
+            return
+        obj_id = int(self.meshes_used.selected_value[:3])
+        s = np.logical_and(self.opt['frame'] == self.frame_num, self.opt['obj_id'] == obj_id)
+        self.opt = self.opt[~s]
+        print(f'{obj_model_names[obj_id]} removed')
+        self.update_frame()
+
 
 
 if __name__ == "__main__":

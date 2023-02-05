@@ -1,5 +1,6 @@
 import argparse
 import os
+from copy import deepcopy
 
 import cv2
 import numpy as np
@@ -108,6 +109,7 @@ class Open3dWindow:
         if obj_pose_file is not None:
             self.opt = load_object_pose_table(f"{self.scene_path}/{self.camera_names[0]}/{obj_pose_file}",
                                               only_valid_pose=True)
+            self.meshes = self.load_all_obj_meshes()
             self.view_ctrls.add_child(gui.Label(obj_pose_file))
             self.obj_pose_box.set_on_checked(self.update_frame)
             self.view_ctrls.add_child(self.obj_pose_box)
@@ -139,20 +141,28 @@ class Open3dWindow:
     def update_frame(self, args=None):
         pass
 
-    def load_obj_meshes(self):
-        obj_id_meshes = []
-        for t in self.opt[self.opt['frame'] == self.frame_num]:
-            obj_id = t['obj_id']
-            if obj_id == 26:
-                continue
-            geometry = o3d.io.read_point_cloud(obj_ply_paths[obj_id])
-            pose = t['pose']
-            geometry.translate(pose[0:3, 3])
-            center = geometry.get_center()
-            geometry.rotate(pose[0:3, 0:3], center=center)
+    def load_all_obj_meshes(self):
+        meshes = {}
+        for id, p in obj_ply_paths.items():
+            geometry = o3d.io.read_point_cloud(p)
             geometry.points = o3d.utility.Vector3dVector(np.array(geometry.points) / 1000)
-            obj_id_meshes.append((obj_id, geometry))
-        return obj_id_meshes
+            meshes[id] = geometry
+        return meshes
+
+    def load_obj_mesh(self, obj_id):
+        d = np.logical_and(self.opt['frame'] == self.frame_num, self.opt['obj_id'] == obj_id)
+        t = self.opt[d]
+        if len(t) == 0:
+            return None
+        assert len(t) == 1
+        t = t[0]
+
+        geometry = deepcopy(self.meshes[obj_id])
+        pose = t['pose']
+        geometry.translate(pose[0:3, 3] / 1000)
+        center = geometry.get_center()
+        geometry.rotate(pose[0:3, 0:3], center=center)
+        return geometry
 
 
 if __name__ == "__main__":

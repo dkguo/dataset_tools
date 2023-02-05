@@ -141,8 +141,8 @@ class PointCloudWindow(Open3dWindow):
 
         # add objs
         if self.obj_pose_box.checked:
-            self.obj_id_meshes = self.load_obj_meshes()
-            for obj_id, mesh in self.obj_id_meshes:
+            for obj_id in self.opt[self.opt['frame'] == self.frame_num]['obj_id']:
+                mesh = self.load_obj_mesh(obj_id)
                 self.scene_widget.scene.add_geometry(str(obj_id), mesh, self.settings.obj_material)
 
         # calculate distance
