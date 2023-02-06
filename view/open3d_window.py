@@ -164,6 +164,18 @@ class Open3dWindow:
         geometry.rotate(pose[0:3, 0:3], center=center)
         return geometry
 
+    def on_keyboard_input(self, event):
+        pass
+
+    def on_change_active_camera_view(self, camera_id):
+        if camera_id < len(self.camera_names):
+            print(f'Change to camera_{camera_id + 1:02d}')
+            self.active_camera_view = camera_id
+            self.set_active_camera_view()
+
+    def set_active_camera_view(self):
+        pass
+
 
 if __name__ == "__main__":
     scene_name = 'scene_2211192313'

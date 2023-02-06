@@ -62,7 +62,7 @@ class PointCloudWindow(Open3dWindow):
             self.selected_cameras.append((i, box))
 
         self.update_frame()
-        self.set_camera_view()
+        self.set_active_camera_view()
 
     def on_layout(self, layout_context):
         r = self.window.content_rect
@@ -76,11 +76,10 @@ class PointCloudWindow(Open3dWindow):
         self.settings.pcd_material.point_size = int(size)
         self.scene_widget.scene.modify_geometry_material("pcd", self.settings.pcd_material)
 
-    def set_camera_view(self):
-        camera_name = get_camera_names(self.scene_path)[self.active_camera_view]
-        intrinsic = load_intrinsics(f'{self.scene_path}/{camera_name}/camera_meta.yml')
-        extrinsics = load_extrinsics(f'{self.scene_path}/extrinsics.yml')
-        extrinsic = np.linalg.inv(extrinsics[camera_name])
+    def set_active_camera_view(self):
+        camera_name = self.camera_names[self.active_camera_view]
+        intrinsic = self.intrinsics[camera_name]
+        extrinsic = self.extrinsics[camera_name]
         self.scene_widget.setup_camera(intrinsic, extrinsic, 640, 480, self.bounds)
 
     def load_pcds(self):
@@ -149,6 +148,13 @@ class PointCloudWindow(Open3dWindow):
         if self.hand_mask_intsct_box.checked and self.obj_pose_box.checked and len(convex_hulls) > 0:
             calculate_hand_obj_distance(pcd, self.obj_id_meshes)
 
+    def get_selected_camera_names(self):
+        active_camera_ids = []
+        for i, box in self.selected_cameras:
+            if box.checked:
+                active_camera_ids.append(i)
+        return np.array(self.camera_names)[active_camera_ids]
+
     def on_keyboard_input(self, event):
         if event.is_repeat:
             return gui.Widget.EventCallbackResult.HANDLED
@@ -158,19 +164,9 @@ class PointCloudWindow(Open3dWindow):
             if event.type == gui.KeyEvent.DOWN:
                 view_id = event.key - 49
                 if view_id < len(self.camera_names):
-                    print(f'Change to camera_{view_id + 1:02d}')
-                    self.active_camera_view = view_id
-                    self.set_camera_view()
+                    self.on_change_active_camera_view(view_id)
                     return gui.Widget.EventCallbackResult.HANDLED
-
         return gui.Widget.EventCallbackResult.HANDLED
-
-    def get_selected_camera_names(self):
-        active_camera_ids = []
-        for i, box in self.selected_cameras:
-            if box.checked:
-                active_camera_ids.append(i)
-        return np.array(self.camera_names)[active_camera_ids]
 
     def save_hand_obj_dists(self, save_file_path):
         detections = np.empty(0, dtype=[('scene_name', 'U20'),

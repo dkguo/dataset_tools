@@ -1,5 +1,7 @@
 # from dataset_tools.view.renderer import create_renderer
 # create_renderer()
+from copy import deepcopy
+
 import numpy as np
 import open3d as o3d
 
@@ -16,7 +18,14 @@ class Annotation(Open3dWindow):
         super().__init__(width, height, scene_name, 'Point Cloud', init_frame_num, obj_pose_file=obj_pose_file)
         em = self.window.theme.font_size
 
+        self.window.set_on_key(self.on_keyboard_input)
+
+        self.dist = 0.05
+        self.deg = 30
+
         self.obj_pose_box.checked = True
+        self.left_shift_modifier = False
+        self.annotation_changed = False
 
         self.objects = gui.CollapsableVert("Objects", 0.33 * em, gui.Margins(em, 0, 0, 0))
         self.objects.set_is_open(True)
@@ -127,6 +136,143 @@ class Annotation(Open3dWindow):
         self.opt = self.opt[~s]
         print(f'{obj_model_names[obj_id]} removed')
         self.update_frame()
+
+    def on_keyboard_input(self, event):
+        if event.is_repeat:
+            return True
+
+        # Change camera view
+        if event.key >= 49 and event.key <= 56:
+            if event.type == gui.KeyEvent.DOWN:
+                view_id = event.key - 49
+                if view_id < len(self.camera_names):
+                    self.on_change_active_camera_view(view_id)
+                    return True
+
+        if event.key == gui.KeyName.LEFT_SHIFT:
+            if event.type == gui.KeyEvent.DOWN:
+                self.left_shift_modifier = True
+            elif event.type == gui.KeyEvent.UP:
+                self.left_shift_modifier = False
+            return True
+
+        # if ctrl is pressed then increase translation and angle values
+        if event.key == gui.KeyName.LEFT_CONTROL:
+            if event.type == gui.KeyEvent.DOWN:
+                self.dist = 0.02
+                self.deg = 5
+            elif event.type == gui.KeyEvent.UP:
+                self.dist = 0.05
+                self.deg = 30
+            return True
+
+        if event.key == gui.KeyName.ALT:
+            if event.type == gui.KeyEvent.DOWN:
+                self.dist = 0.005
+                self.deg = 1
+            elif event.type == gui.KeyEvent.UP:
+                self.dist = 0.05
+                self.deg = 30
+            return True
+
+        # if no active_mesh selected print error
+        if self.meshes_used.selected_index == -1:
+            print("No objects are selected in scene meshes")
+            return True
+
+        # Translation object
+        if event.type == gui.KeyEvent.DOWN:
+            if not self.left_shift_modifier:
+                if event.key == gui.KeyName.J:
+                    print("J pressed: translate to left")
+                    self.move_selected_obj(-self.dist, 0, 0, 0, 0, 0)
+                elif event.key == gui.KeyName.L:
+                    print("L pressed: translate to right")
+                    self.move_selected_obj(self.dist, 0, 0, 0, 0, 0)
+                elif event.key == gui.KeyName.K:
+                    print("K pressed: translate down")
+                    self.move_selected_obj(0, self.dist, 0, 0, 0, 0)
+                elif event.key == gui.KeyName.I:
+                    print("I pressed: translate up")
+                    self.move_selected_obj(0, -self.dist, 0, 0, 0, 0)
+                elif event.key == gui.KeyName.U:
+                    print("U pressed: translate furthur")
+                    self.move_selected_obj(0, 0, self.dist, 0, 0, 0)
+                elif event.key == gui.KeyName.O:
+                    print("O pressed: translate closer")
+                    self.move_selected_obj(0, 0, -self.dist, 0, 0, 0)
+
+            # Rotation - keystrokes are not in same order as translation to make movement more human intuitive
+            else:
+                print("Left-Shift is clicked; rotation mode")
+                if event.key == gui.KeyName.O:
+                    print("O pressed: rotate CW")
+                    self.move_selected_obj(0, 0, 0, 0, 0, self.deg * np.pi / 180)
+                elif event.key == gui.KeyName.U:
+                    print("U pressed: rotate CCW")
+                    self.move_selected_obj(0, 0, 0, 0, 0, -self.deg * np.pi / 180)
+                elif event.key == gui.KeyName.J:
+                    print("J pressed: rotate towards left")
+                    self.move_selected_obj(0, 0, 0, 0, self.deg * np.pi / 180, 0)
+                elif event.key == gui.KeyName.L:
+                    print("L pressed: rotate towards right")
+                    self.move_selected_obj(0, 0, 0, 0, -self.deg * np.pi / 180, 0)
+                elif event.key == gui.KeyName.K:
+                    print("K pressed: rotate downwards")
+                    self.move_selected_obj(0, 0, 0, self.deg * np.pi / 180, 0, 0)
+                elif event.key == gui.KeyName.I:
+                    print("I pressed: rotate upwards")
+                    self.move_selected_obj(0, 0, 0, -self.deg * np.pi / 180, 0, 0)
+
+        return True
+
+    def move_selected_obj(self, x, y, z, rx, ry, rz):
+        self.annotation_changed = True
+
+        obj_id = int(self.meshes_used.selected_value[:3])
+        d = np.logical_and(self.opt['frame'] == self.frame_num, self.opt['obj_id'] == obj_id)
+        assert len(d.nonzero()[0] == 1)
+        d = d.nonzero()[0][0]
+        pose = self.opt[d]['pose']
+
+        geometry = deepcopy(self.meshes[obj_id])
+        geometry.translate(pose[0:3, 3] / 1000)
+        center = pose[0:3, 3] / 1000
+        print(pose, center)
+        geometry.rotate(pose[0:3, 0:3], center=center)
+
+        # T_ci_to_master = self.extrinsics[self.camera_names[self.active_camera_view]]
+        # T_master_to_c0 = self.extrinsics[self.camera_names[0]]
+        T_ci_to_c0 = self.extrinsics[self.camera_names[self.active_camera_view]]
+
+        # translation or rotation
+        if x != 0 or y != 0 or z != 0:
+            ci_h_transform = np.array([[1, 0, 0, x], [0, 1, 0, y], [0, 0, 1, z], [0, 0, 0, 1]])
+        else:
+            c0_center = pose[0:3, 3] / 1000
+            ci_center = T_ci_to_c0 @ np.append(c0_center, 1)
+            ci_center = ci_center[:3]
+
+            ci_T_neg = np.vstack((np.hstack((np.identity(3), -ci_center.reshape(3, 1))), [0, 0, 0, 1]))
+            ci_T_pos = np.vstack((np.hstack((np.identity(3), ci_center.reshape(3, 1))), [0, 0, 0, 1]))
+
+            rot_mat_obj_center = o3d.geometry.get_rotation_matrix_from_xyz((rx, ry, rz))
+            R = np.vstack((np.hstack((rot_mat_obj_center, [[0], [0], [0]])), [0, 0, 0, 1]))
+            ci_h_transform = np.matmul(ci_T_pos, np.matmul(R, ci_T_neg))
+            print(ci_h_transform)
+            # ci_h_transform = R
+
+        h_transform = np.linalg.inv(T_ci_to_c0) @ ci_h_transform @ T_ci_to_c0
+        print(T_ci_to_c0, h_transform)
+        geometry.transform(h_transform)
+        h_transform[0:3, 3] *= 1000
+        new_pose = h_transform @ pose
+        self.opt[d]['pose'] = new_pose
+
+        # update every scene widget
+        for w in self.scene_widgets:
+            w.scene.remove_geometry(str(obj_id))
+            w.scene.add_geometry(str(obj_id), geometry, self.settings.obj_material)
 
 
 
