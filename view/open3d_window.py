@@ -8,7 +8,7 @@ import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 
-from dataset_tools.config import dataset_path, obj_ply_paths
+from dataset_tools.config import dataset_path, obj_ply_paths, obj_model_paths
 from dataset_tools.loaders import get_camera_names, load_intrinsics, load_extrinsics, get_depth_scale, \
     load_object_pose_table, get_num_frame
 
@@ -144,8 +144,9 @@ class Open3dWindow:
     def load_all_obj_meshes(self):
         meshes = {}
         for id, p in obj_ply_paths.items():
-            geometry = o3d.io.read_point_cloud(p)
-            geometry.points = o3d.utility.Vector3dVector(np.array(geometry.points) / 1000)
+            geometry = o3d.io.read_triangle_mesh(p)
+            geometry = geometry.scale(0.001, geometry.get_center() / 1000)
+            # geometry.points = o3d.utility.Vector3dVector(np.array(geometry.points) / 1000)
             meshes[id] = geometry
         return meshes
 
@@ -160,7 +161,7 @@ class Open3dWindow:
         geometry = deepcopy(self.meshes[obj_id])
         pose = t['pose']
         geometry.translate(pose[0:3, 3] / 1000)
-        center = geometry.get_center()
+        center = pose[0:3, 3] / 1000
         geometry.rotate(pose[0:3, 0:3], center=center)
         return geometry
 

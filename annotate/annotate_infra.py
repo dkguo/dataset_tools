@@ -8,9 +8,8 @@ import open3d as o3d
 from open3d.visualization import gui, rendering
 
 from dataset_tools.config import ycb_model_names, obj_model_names
-from dataset_tools.loaders import load_intrinsics, load_extrinsics
 from dataset_tools.view.open3d_window import Open3dWindow
-from dataset_tools.view.point_cloud_simple import load_pcd_from_rgbd, PointCloudWindow
+from dataset_tools.view.point_cloud_simple import load_pcd_from_rgbd
 
 
 class Annotation(Open3dWindow):
@@ -66,8 +65,8 @@ class Annotation(Open3dWindow):
         h = r.height // 3
         assert len(self.scene_widgets) == 8
         for i, s in enumerate(self.scene_widgets):
-            row = i // 3
-            col = i % 3
+            col = i // 3
+            row = i % 3
             s.frame = gui.Rect(row * w, col * h, w, h)
 
     def on_point_size(self, size):
@@ -238,18 +237,15 @@ class Annotation(Open3dWindow):
         geometry = deepcopy(self.meshes[obj_id])
         geometry.translate(pose[0:3, 3] / 1000)
         center = pose[0:3, 3] / 1000
-        print(pose, center)
         geometry.rotate(pose[0:3, 0:3], center=center)
 
-        # T_ci_to_master = self.extrinsics[self.camera_names[self.active_camera_view]]
-        # T_master_to_c0 = self.extrinsics[self.camera_names[0]]
         T_ci_to_c0 = self.extrinsics[self.camera_names[self.active_camera_view]]
 
         # translation or rotation
         if x != 0 or y != 0 or z != 0:
             ci_h_transform = np.array([[1, 0, 0, x], [0, 1, 0, y], [0, 0, 1, z], [0, 0, 0, 1]])
         else:
-            c0_center = pose[0:3, 3] / 1000
+            c0_center = geometry.get_center()
             ci_center = T_ci_to_c0 @ np.append(c0_center, 1)
             ci_center = ci_center[:3]
 
@@ -259,11 +255,9 @@ class Annotation(Open3dWindow):
             rot_mat_obj_center = o3d.geometry.get_rotation_matrix_from_xyz((rx, ry, rz))
             R = np.vstack((np.hstack((rot_mat_obj_center, [[0], [0], [0]])), [0, 0, 0, 1]))
             ci_h_transform = np.matmul(ci_T_pos, np.matmul(R, ci_T_neg))
-            print(ci_h_transform)
-            # ci_h_transform = R
 
         h_transform = np.linalg.inv(T_ci_to_c0) @ ci_h_transform @ T_ci_to_c0
-        print(T_ci_to_c0, h_transform)
+
         geometry.transform(h_transform)
         h_transform[0:3, 3] *= 1000
         new_pose = h_transform @ pose
@@ -275,13 +269,11 @@ class Annotation(Open3dWindow):
             w.scene.add_geometry(str(obj_id), geometry, self.settings.obj_material)
 
 
-
 if __name__ == "__main__":
     scene_name = 'scene_2210232307_01'
     start_image_num = 40
     hand_mask_dir = 'hand_pose/d2/mask'
-    obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
-
+    obj_pose_file = 'object_pose/ground_truth.csv'
 
     gui.Application.instance.initialize()
     w = Annotation(scene_name, start_image_num, obj_pose_file=obj_pose_file)

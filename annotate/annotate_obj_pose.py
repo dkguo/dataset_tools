@@ -368,6 +368,11 @@ class AppWindow:
 
             h_transform = np.linalg.inv(T_ci_to_c0) @ ci_h_transform @ T_ci_to_c0
 
+            print('hi', ci_h_transform)
+            print('h0', h_transform)
+            print('pose', active_obj.transform)
+            print('new pose', np.matmul(h_transform, active_obj.transform))
+
             active_obj.obj_geometry.transform(h_transform)
             # center = active_obj.obj_geometry.get_center()
             self.pc_scene_widget.scene.remove_geometry(active_obj.obj_name)
@@ -667,24 +672,20 @@ class AppWindow:
         else:
             print("[WARNING] Failed to read points")
 
-        try:
-            self.pc_scene_widget.scene.add_geometry("annotation_scene", geometry, self.settings.scene_material,
-                                                    add_downsampled_copy_for_fast_rendering=True)
-            bounds = geometry.get_axis_aligned_bounding_box()
-            self.pc_scene_widget.setup_camera(60, bounds, bounds.get_center())
-            center = np.array([0, 0, 0])
-            eye = center + np.array([0, 0, -0.5])
-            up = np.array([0, -1, 0])
-            self.pc_scene_widget.look_at(center, eye, up)
+        self.pc_scene_widget.scene.add_geometry("annotation_scene", geometry, self.settings.scene_material,
+                                                add_downsampled_copy_for_fast_rendering=True)
+        bounds = geometry.get_axis_aligned_bounding_box()
+        self.pc_scene_widget.setup_camera(60, bounds, bounds.get_center())
+        center = np.array([0, 0, 0])
+        eye = center + np.array([0, 0, -0.5])
+        up = np.array([0, -1, 0])
+        self.pc_scene_widget.look_at(center, eye, up)
 
-            self._annotation_scene = AnnotationScene(geometry, image_num)
-            self._meshes_used.set_items([])  # clear list from last loaded scene
+        self._annotation_scene = AnnotationScene(geometry, image_num)
+        self._meshes_used.set_items([])  # clear list from last loaded scene
 
-            # load values if an annotation already exists
-            self._load_annotation(image_num)
-
-        except Exception as e:
-            print(e)
+        # load values if an annotation already exists
+        self._load_annotation(image_num)
 
         self._update_rgb_views()
         self._update_img_numbers()
@@ -699,7 +700,8 @@ class AppWindow:
             scene_data = data[str(image_num)]
             for obj in scene_data:
                 # add object to annotation_scene object
-                obj_geometry = o3d.io.read_point_cloud(obj_ply_paths[int(obj['obj_id'])])
+                print('load ', int(obj['obj_id'])-1)
+                obj_geometry = o3d.io.read_point_cloud(list(obj_ply_paths.values())[int(obj['obj_id'])-1])
                 obj_geometry.points = o3d.utility.Vector3dVector(
                     np.array(obj_geometry.points) / 1000)  # convert mm to meter
                 model_name = ycb_model_names[int(obj['obj_id']) - 1]
@@ -728,7 +730,7 @@ class AppWindow:
         self._meshes_used.set_items(meshes)
 
     def _update_rgb_views(self):
-        print('updating rgb views...')
+        # print('updating rgb views...')
         tt = time.time()
         obj_ext_poses = {}
         objs = self._annotation_scene.get_objects()
@@ -760,7 +762,7 @@ class AppWindow:
         img = collage_imgs(imgs, num_rows=3)
         img_geo = o3d.geometry.Image(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         self.im_scene_widget.scene.set_background([0, 0, 0, 0], img_geo)
-        print('rgb view updated')
+        # print('rgb view updated')
 
     def update_obj_list(self):
         self._meshes_available.set_items(ycb_model_names)
@@ -845,7 +847,7 @@ def main():
     parser = argparse.ArgumentParser(description='Annotation tool.')
     parser.add_argument('--scene_name', default='scene_2210232307_01')
     # parser.add_argument('--scene_name', default='scene_2210232348_wzq')
-    parser.add_argument('--start_frame', type=int, default=20)
+    parser.add_argument('--start_frame', type=int, default=40)
 
     args = parser.parse_args()
     scene_name = args.scene_name
