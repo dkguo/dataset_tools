@@ -8,6 +8,7 @@ import open3d as o3d
 from open3d.visualization import gui, rendering
 
 from dataset_tools.config import ycb_model_names, obj_model_names
+from dataset_tools.loaders import save_object_pose_table
 from dataset_tools.view.open3d_window import Open3dWindow
 from dataset_tools.view.point_cloud_simple import load_pcd_from_rgbd
 
@@ -27,20 +28,25 @@ class Annotation(Open3dWindow):
         self.annotation_changed = False
 
         self.objects = gui.CollapsableVert("Objects", 0.33 * em, gui.Margins(em, 0, 0, 0))
-        self.objects.set_is_open(True)
         self.meshes_available = gui.ListView()
         self.meshes_available.set_max_visible_items(10)
         self.meshes_available.set_items(ycb_model_names)
         self.meshes_used = gui.ListView()
         self.meshes_used.set_max_visible_items(5)
         self.add_mesh_button = gui.Button("Add Mesh")
-        self.remove_mesh_button = gui.Button("Remove Mesh")
         self.add_mesh_button.set_on_clicked(self.on_add_mesh)
+        self.remove_mesh_button = gui.Button("Remove Mesh")
         self.remove_mesh_button.set_on_clicked(self.on_remove_mesh)
+        self.save_obj_pose_button = gui.Button("Save Object Pose")
+        self.save_obj_pose_button.set_on_clicked(self.on_save_obj_pose)
+        self.save_infra_pose_button = gui.Button("Save Infrastructure Pose")
+        self.save_infra_pose_button.set_on_clicked(self.on_save_infra_pose)
         self.objects.add_child(self.meshes_available)
         self.objects.add_child(self.add_mesh_button)
         self.objects.add_child(self.meshes_used)
         self.objects.add_child(self.remove_mesh_button)
+        self.objects.add_child(self.save_obj_pose_button)
+        self.objects.add_child(self.save_infra_pose_button)
         self.settings_panel.add_child(self.objects)
 
         self.scene_widgets = []
@@ -100,6 +106,7 @@ class Annotation(Open3dWindow):
             self.scene_widgets[i].setup_camera(intrinsic, extrinsic, 640, 480, bounds)
 
             if self.obj_pose_box.checked:
+                self.objects.set_is_open(True)
                 obj_ids = self.opt[self.opt['frame'] == self.frame_num]['obj_id']
                 for obj_id in obj_ids:
                     mesh = self.load_obj_mesh(obj_id)
@@ -107,6 +114,7 @@ class Annotation(Open3dWindow):
                 self.meshes_used.set_items([obj_model_names[i] for i in obj_ids])
             else:
                 self.meshes_used.set_items([])
+                self.objects.set_is_open(False)
 
     def on_add_mesh(self):
         if self.meshes_available.selected_index == -1:
@@ -135,6 +143,18 @@ class Annotation(Open3dWindow):
         self.opt = self.opt[~s]
         print(f'{obj_model_names[obj_id]} removed')
         self.update_frame()
+
+    def on_save_obj_pose(self):
+        opt = self.opt[self.opt['obj_id'] < 99]
+        save_object_pose_table(opt, f'{self.scene_path}/object_pose/ground_truth/object_poses_tmp.csv')
+        self.annotation_changed = False
+        print('object pose saved')
+
+    def on_save_infra_pose(self):
+        ipt = self.opt[self.opt['obj_id'] > 99]
+        save_object_pose_table(ipt, f'{self.scene_path}/object_pose/ground_truth/infra_poses_tmp.csv')
+        self.annotation_changed = False
+        print('infrastructure pose saved')
 
     def on_keyboard_input(self, event):
         if event.is_repeat:
@@ -271,7 +291,7 @@ class Annotation(Open3dWindow):
 
 if __name__ == "__main__":
     scene_name = 'scene_2210232307_01'
-    start_image_num = 40
+    start_image_num = 0
     hand_mask_dir = 'hand_pose/d2/mask'
     obj_pose_file = 'object_pose/ground_truth.csv'
 

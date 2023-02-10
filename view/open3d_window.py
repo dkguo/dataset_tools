@@ -29,7 +29,8 @@ class Settings:
 
 
 class Open3dWindow:
-    def __init__(self, width, height, scene_name, window_name, init_frame_num=0, obj_pose_file=None):
+    def __init__(self, width, height, scene_name, window_name, init_frame_num=0,
+                 obj_pose_file=None, infra_pose_file=None):
         self.scene_name = scene_name
         self.scene_path = f'{dataset_path}/{scene_name}'
         self.active_camera_view = 0
@@ -114,7 +115,17 @@ class Open3dWindow:
             self.obj_pose_box.set_on_checked(self.update_frame)
             self.view_ctrls.add_child(self.obj_pose_box)
             self.view_ctrls.add_child(gui.Label(""))
-            self.obj_id_meshes = []
+
+        # infrastructure poses
+        self.infra_pose_file = infra_pose_file
+        self.infra_pose_box = gui.Checkbox(f'Infrastructure')
+        if infra_pose_file is not None:
+            self.ipt = load_object_pose_table(f"{self.scene_path}/{infra_pose_file}",
+                                              only_valid_pose=True)
+            self.view_ctrls.add_child(gui.Label(infra_pose_file))
+            self.infra_pose_box.set_on_checked(self.update_frame)
+            self.view_ctrls.add_child(self.infra_pose_box)
+            self.view_ctrls.add_child(gui.Label(""))
 
     def load_images(self):
         for camera_name in np.array(self.camera_names):
@@ -153,13 +164,20 @@ class Open3dWindow:
     def load_obj_mesh(self, obj_id):
         d = np.logical_and(self.opt['frame'] == self.frame_num, self.opt['obj_id'] == obj_id)
         t = self.opt[d]
-        if len(t) == 0:
+        return self.load_mesh(t, obj_id)
+
+    def load_infra_mesh(self, infra_id):
+        t = self.ipt[self.ipt['obj_id'] == infra_id]
+        return self.load_mesh(t, infra_id)
+
+    def load_mesh(self, table_rows, obj_id):
+        if len(table_rows) == 0:
             return None
-        assert len(t) == 1
-        t = t[0]
+        assert len(table_rows) == 1
+        table_row = table_rows[0]
 
         geometry = deepcopy(self.meshes[obj_id])
-        pose = t['pose']
+        pose = table_row['pose']
         geometry.translate(pose[0:3, 3] / 1000)
         center = pose[0:3, 3] / 1000
         geometry.rotate(pose[0:3, 0:3], center=center)
@@ -179,7 +197,7 @@ class Open3dWindow:
 
 
 if __name__ == "__main__":
-    scene_name = 'scene_2211192313'
+    scene_name = 'scene_2210232307_01'
     gui.Application.instance.initialize()
     w = Open3dWindow(2048, 1536, scene_name, 'test')
     gui.Application.instance.run()

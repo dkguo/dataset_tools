@@ -33,7 +33,9 @@ ycb_model_names = [
     "061_foam_brick",
     "026_sponge",
     "100_kitchen_sink",
-    "101_faucet_main"
+    "101_faucet_main",
+    "102_faucet_with_cap",
+    "103_sink_only"
 ]
 
 obj_model_names = {}
