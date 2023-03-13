@@ -10,6 +10,7 @@ from dataset_tools.loaders import load_cameras_intrisics, load_cameras_extrinsic
     load_imgs_across_cameras, get_camera_names, intr2param
 from dataset_tools.record.apriltag_detection import verify_calibration, detect_april_tag, draw_pose, draw_pose_axes
 from dataset_tools.view.helpers import collage_imgs
+from dataset_tools.view.renderer import create_renderer, render_obj_pose, overlay_imgs, set_intrinsics
 
 
 def extract_infra_pose(scene_name, infra_tag_id=1, infra_tag_size=0.06):
@@ -32,13 +33,21 @@ def extract_infra_pose(scene_name, infra_tag_id=1, infra_tag_size=0.06):
 
     camera, pose = best_pose
 
-    # rotate -90 around z
+    # change to right pose
     rm = np.zeros((4, 4))
-    rm[0, 1] = -1
-    rm[1, 0] = 1
-    rm[2, 2] = 1
+    rm[0, 0] = 1
+    rm[1, 1] = -1
+    rm[2, 2] = -1
     rm[3, 3] = 1
     tag_pose = pose @ rm
+
+    rm = np.zeros((4, 4))
+    rm[0, 1] = 1
+    rm[1, 0] = -1
+    rm[2, 2] = 1
+    rm[3, 3] = 1
+    tag_pose = tag_pose @ rm
+
     tag_pose = cameras_ext[camera] @ tag_pose
     infra_pose = {'SINK_UNIT_ORIGIN': tag_pose.tolist(),
                   'TAG_SIZE': 0.06,
@@ -64,8 +73,15 @@ def view_april_tag_pose(tag_pose, imgs, cameras_intr, camera_ext, tag_size):
     overlay = collage_imgs(overlays)
     cv2.imshow('orignal tags', overlay)
 
+    re_ims = []
+    renderer = create_renderer()
     for img, intr, ext in zip(imgs, cameras_intr.values(), camera_ext.values()):
         pose = np.linalg.inv(ext) @ tag_pose
+
+        set_intrinsics(renderer, intr)
+        rendered_im = render_obj_pose(renderer, [(4, pose)], unit='m')
+        rendered_im = overlay_imgs(img, rendered_im)
+        re_ims.append(rendered_im)
 
         camera_params = intr2param(intr)
         draw_pose(img, camera_params, tag_size, pose)
@@ -73,6 +89,9 @@ def view_april_tag_pose(tag_pose, imgs, cameras_intr, camera_ext, tag_size):
 
     preview = collage_imgs(imgs)
     cv2.imshow('verify', preview)
+
+    preview = collage_imgs(re_ims)
+    cv2.imshow('verify 2', preview)
     key = cv2.waitKey(0)
     if key & 0xFF == ord('q') or key == 27:
         cv2.destroyAllWindows()
