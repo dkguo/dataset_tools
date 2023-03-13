@@ -19,8 +19,9 @@ def extract_infra_pose(scene_name, infra_tag_id=1, infra_tag_size=0.06):
     cameras_intr = load_cameras_intrisics(scene_name)
     cameras_ext = load_cameras_extrinsics(scene_name)
 
+    print('Extracting infra pose')
     min_ef = np.Inf
-    for frame in tqdm(range(10)):
+    for frame in tqdm(range(50)):
         imgs = load_imgs_across_cameras(scene_path, get_camera_names(scene_path), f'{frame:06d}.png')
         for camera, img in zip(get_camera_names(scene_path), imgs):
             intr = cameras_intr[camera]

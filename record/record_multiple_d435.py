@@ -12,7 +12,7 @@ from dataset_tools.view.helpers import collage_imgs
 
 # settings
 frame_rate = 30  # fps
-scene_name = 'scene_' + datetime.now().strftime("%y%m%d%H%M")
+scene_name = 'scene_' + datetime.now().strftime("%y%m%d%H%M%S")
 
 
 if __name__ == '__main__':
