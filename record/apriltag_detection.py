@@ -54,7 +54,7 @@ def draw_pose(overlay, camera_params, tag_size, pose, z_sign=1, color=(0, 255, 0
         cv2.line(overlay, ipoints[i], ipoints[j], color, 1, 16)
 
 
-def draw_pose_axes(overlay, camera_params, tag_size, pose, center):
+def draw_pose_axes(overlay, camera_params, tag_size, pose, center=None):
     fx, fy, cx, cy = camera_params
     K = np.array([fx, 0, cx, 0, fy, cy, 0, 0, 1]).reshape(3, 3)
 
@@ -70,8 +70,11 @@ def draw_pose_axes(overlay, camera_params, tag_size, pose, center):
     ipoints, _ = cv2.projectPoints(opoints, rvec, tvec, K, dcoeffs)
     ipoints = np.round(ipoints).astype(int)
 
-    center = np.round(center).astype(int)
-    center = tuple(center.ravel())
+    cpoints = np.float32([[0, 0, 0]]).reshape(-1, 3) * tag_size
+    cpoints, _ = cv2.projectPoints(cpoints, rvec, tvec, K, dcoeffs)
+    cpoints = np.round(cpoints).astype(int)
+
+    center = tuple(cpoints[0].ravel())
 
     cv2.line(overlay, center, tuple(ipoints[0].ravel()), (0, 0, 255), 2)
     cv2.line(overlay, center, tuple(ipoints[1].ravel()), (0, 255, 0), 2)
