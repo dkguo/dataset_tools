@@ -845,7 +845,7 @@ class AppWindow:
 
 def main():
     parser = argparse.ArgumentParser(description='Annotation tool.')
-    parser.add_argument('--scene_name', default='scene_2210232307_01')
+    parser.add_argument('--scene_name', default='scene_2303102008')
     # parser.add_argument('--scene_name', default='scene_2210232348_wzq')
     parser.add_argument('--start_frame', type=int, default=40)
 

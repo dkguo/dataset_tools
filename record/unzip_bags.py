@@ -97,5 +97,5 @@ def unzip_bags(scene_name):
 
 
 if __name__ == '__main__':
-    scene_name = 'scene_2212031404'
+    scene_name = 'scene_2303102008'
     unzip_bags(scene_name)

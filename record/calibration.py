@@ -46,12 +46,12 @@ def calibration(scene_path=scene_path):
     parser.add_arguments(Calibrate, dest="app")
     program = parser.parse_args()
 
-    program.app.paths.boards = './multical/example_boards/boards.yaml'
+    program.app.paths.boards = f'{os.path.dirname(os.path.abspath(__file__))}/multical/example_boards/boards.yaml'
     program.app.paths.image_path = scene_path
     program.app.paths.limit_images = 2000
     program.app.vis = vis_calibration
     program.app.optimizer.fix_intrinsic = True
-    program.app.camera_name.calibration = f'{scene_path}/intrinsics.json'
+    program.app.camera.calibration = f'{scene_path}/intrinsics.json'
 
     program.app.execute()
 

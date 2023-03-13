@@ -115,6 +115,9 @@ class Open3dWindow:
             self.obj_pose_box.set_on_checked(self.update_frame)
             self.view_ctrls.add_child(self.obj_pose_box)
             self.view_ctrls.add_child(gui.Label(""))
+        else:
+            print('here')
+            self.obj_pose_box.checked = False
 
         # infrastructure poses
         self.infra_pose_file = infra_pose_file

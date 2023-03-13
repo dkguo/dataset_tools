@@ -23,7 +23,6 @@ class Annotation(Open3dWindow):
         self.dist = 0.05
         self.deg = 30
 
-        self.obj_pose_box.checked = True
         self.left_shift_modifier = False
         self.annotation_changed = False
 
@@ -290,12 +289,13 @@ class Annotation(Open3dWindow):
 
 
 if __name__ == "__main__":
-    scene_name = 'scene_2210232307_01'
+    scene_name = 'scene_2303102008'
     start_image_num = 0
     hand_mask_dir = 'hand_pose/d2/mask'
     obj_pose_file = 'object_pose/ground_truth.csv'
 
     gui.Application.instance.initialize()
-    w = Annotation(scene_name, start_image_num, obj_pose_file=obj_pose_file)
+    # w = Annotation(scene_name, start_image_num, obj_pose_file=obj_pose_file)
+    w = Annotation(scene_name, start_image_num)
 
     gui.Application.instance.run()

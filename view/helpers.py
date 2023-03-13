@@ -40,12 +40,16 @@ def collage_imgs(ims, num_rows=2):
         for i in range(3):
             h_ims.append(np.concatenate([imgs[3*i], imgs[3*i+1], imgs[3*i+2]], axis=1))
         img = np.concatenate(h_ims, axis=0)
+    elif len(imgs) == 12:
+        h_im_1 = collage_imgs(imgs[:6])
+        h_im_2 = collage_imgs(imgs[6:])
+        img = np.concatenate([h_im_1, h_im_2], axis=0)
     elif len(imgs) == 16:
         h_im_1 = collage_imgs(imgs[:8])
         h_im_2 = collage_imgs(imgs[8:])
         img = np.concatenate([h_im_1, h_im_2], axis=0)
     else:
-        assert True, f'{len(imgs)} images is not supported'
+        raise TypeError(f'{len(imgs)} images is not supported')
     return img
 
 
