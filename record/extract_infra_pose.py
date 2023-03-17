@@ -1,3 +1,4 @@
+import csv
 from pprint import pprint
 
 import cv2
@@ -21,7 +22,7 @@ def extract_infra_pose(scene_name, infra_tag_id=1, infra_tag_size=0.06):
 
     print('Extracting infra pose')
     min_ef = np.Inf
-    for frame in tqdm(range(50)):
+    for frame in tqdm(range(10)):
         imgs = load_imgs_across_cameras(scene_path, get_camera_names(scene_path), f'{frame:06d}.png')
         for camera, img in zip(get_camera_names(scene_path), imgs):
             intr = cameras_intr[camera]
@@ -50,17 +51,41 @@ def extract_infra_pose(scene_name, infra_tag_id=1, infra_tag_size=0.06):
     tag_pose = tag_pose @ rm
 
     tag_pose = cameras_ext[camera] @ tag_pose
-    infra_pose = {'SINK_UNIT_ORIGIN': tag_pose.tolist(),
-                  'TAG_SIZE': 0.06,
-                  'TAG_ID': 1}
-    pprint(infra_pose)
 
-    with open(f'{scene_path}/infra_pose.yml', 'w') as file:
-        yaml.dump(infra_pose, file)
+    f = open(f'{scene_path}/infra_poses.csv', 'w')
+    csv_writer = csv.writer(f)
+    csv_writer.writerow(['obj_id', 'name', 'frame', 'pose'])
+    csv_writer.writerow([100, 'sink_unit', 0, tag_pose.tolist()])
+
+    rx = np.array([[1, 0, 0, 0],
+                   [0, 0, -1, 0],
+                   [0, 1, 0, 0],
+                   [0, 0, 0, 1]])
+    ry = np.array([[0, 0, 1, 0],
+                   [0, 1, 0, 0],
+                   [-1, 0, 0, 0],
+                   [0, 0, 0, 1]])
+    rz = np.array([[0, -1, 0, 0],
+                   [1, 0, 0, 0],
+                   [0, 0, 1, 0],
+                   [0, 0, 0, 1]])
+    t = np.array([[0, 0, 1, 0.47793],
+                  [1, 0, 0, -0.06707],
+                  [0, 1, 0, -0.29],
+                  [0, 0, 0, 1]])
+    # r = np.array([[0, -1, 0, 0],
+    #               [0, 0, -1, 0],
+    #               [1, 0, 0, 0],
+    #               [0, 0, 0, 1]])
+    # sink_only_pose = tag_pose @ rx @ ry
+    sink_only_pose = tag_pose @ t
+    # sink_only_pose[:3, 3] += np.array([0.06707, 0.47793, 0.29])
+    # sink_only_pose[:3, 3] -= np.array([0.47793, -0.06707, -0.29])
+    csv_writer.writerow([101, 'sink_only', 0, sink_only_pose.tolist()])
 
 
 def load_infra_pose(scene_name):
-    with open(f'{dataset_path}/{scene_name}/infra_pose.yml') as file:
+    with open(f'{dataset_path}/{scene_name}/infra_poses.yml') as file:
         infra_pose = np.array(yaml.safe_load(file)['SINK_UNIT_ORIGIN']).reshape(4, 4)
     return infra_pose
 
@@ -103,15 +128,33 @@ def view_infra_pose(scene_name):
     imgs = load_imgs_across_cameras(scene_path, get_camera_names(scene_path), f'{0:06d}.png')
     cameras_intr = load_cameras_intrisics(scene_name)
     cameras_ext = load_cameras_extrinsics(scene_name)
-    view_april_tag_pose(infra_pose, imgs, cameras_intr, cameras_ext, tag_size)
+    infra_pose = load_infra_pose(scene_name)
+    view_april_tag_pose(infra_pose, imgs, cameras_intr, cameras_ext, tag_size=0.06)
 
 
 if __name__ == '__main__':
-    scene_name = 'scene_2303102008'
+    # scene_names = ['scene_230310200800']
 
-    tag_size = 0.06
+    scene_names = ['scene_230313171600',
+                   'scene_230313171700',
+                   'scene_230313171800',
+                   'scene_230313171900',
+                   'scene_230313172000',
+                   'scene_230313172100',
+                   'scene_230313172200',
+                   'scene_230313172537',
+                   'scene_230313172613',
+                   'scene_230313172659',
+                   'scene_230313172735',
+                   'scene_230313172808',
+                   'scene_230313172840',
+                   'scene_230313172915',
+                   'scene_230313172946',
+                   'scene_230313173036',
+                   'scene_230313173113']
 
-    extract_infra_pose(scene_name)
-    infra_pose = load_infra_pose(scene_name)
-    view_infra_pose(scene_name)
+    for scene_name in scene_names:
+        extract_infra_pose(scene_name)
+
+    # view_infra_pose(scene_name)
 

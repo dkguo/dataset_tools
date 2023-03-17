@@ -11,14 +11,14 @@ from dataset_tools.loaders import get_camera_names
 from dataset_tools.view.helpers import add_frame_num_to_video
 
 
-def png2video(camera_path, frame_rate=30):
-    print(f'Saving {camera_path}/video.mp4')
+def png2video(imgs_dir, frame_rate=30):
+    print(f'Saving {imgs_dir}/video.mp4')
 
-    img = cv2.imread(f'{camera_path}/000000.png')
+    img = cv2.imread(f'{imgs_dir}/000000.png')
     dim = (img.shape[1], img.shape[0])
-    out_video = cv2.VideoWriter(f'{camera_path}/video.mp4', cv2.VideoWriter_fourcc(*'mp4v'), frame_rate, dim)
+    out_video = cv2.VideoWriter(f'{imgs_dir}/video.mp4', cv2.VideoWriter_fourcc(*'mp4v'), frame_rate, dim)
 
-    for img_path in tqdm(sorted(glob.glob(f'{camera_path}/*.png'))):
+    for img_path in tqdm(sorted(glob.glob(f'{imgs_dir}/*.png'))):
         img = cv2.imread(img_path)
         out_video.write(img)
 
@@ -40,19 +40,24 @@ def combine_videos(video_paths, save_path, speed=1):
 
 
 if __name__ == '__main__':
-    scene_name = 'scene_2211192313'
+    scene_name = 'scene_230310200800'
 
-    scene_path = f'{dataset_path}/{scene_name}'
+    scene_names = ['scene_230313172946',
+                   'scene_230313173036',
+                   'scene_230313173113']
 
-    camera_paths = []
-    for camera_name in get_camera_names(scene_path):
-        camera_paths.append(f'{scene_path}/{camera_name}')
+    for scene_name in scene_names:
+        scene_path = f'{dataset_path}/{scene_name}'
 
-    with Pool() as pool:
-        pool.map(png2video, camera_paths)
+        camera_paths = []
+        for camera_name in get_camera_names(scene_path):
+            camera_paths.append(f'{scene_path}/{camera_name}/rgb')
 
-    video_paths = sorted(glob.glob(f'{scene_path}/camera_*/video.mp4'))
-    save_path = f'{scene_path}/video.mp4'
-    combine_videos(video_paths, save_path)
+        with Pool() as pool:
+            pool.map(png2video, camera_paths)
 
-    add_frame_num_to_video(save_path)
+        video_paths = sorted(glob.glob(f'{scene_path}/camera_*/rgb/video.mp4'))
+        save_path = f'{scene_path}/video.mp4'
+        combine_videos(video_paths, save_path)
+
+        add_frame_num_to_video(save_path)

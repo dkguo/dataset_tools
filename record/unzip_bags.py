@@ -3,6 +3,7 @@ import json
 import multiprocessing
 import os
 from datetime import datetime
+from functools import partial
 from multiprocessing import Pool
 
 import pyrealsense2 as rs
@@ -14,7 +15,7 @@ from dataset_tools.bop_toolkit.bop_toolkit_lib.inout import save_im, save_depth
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
 
 
-def unzip_bag(bag_path):
+def unzip_bag(bag_path, preview=True):
     camera_name = os.path.basename(bag_path)[:-4]
     print('processing', bag_path)
     camera_path = bag_path[:-4]
@@ -73,12 +74,13 @@ def unzip_bag(bag_path):
         save_depth(depth_image_path, depth_image)
 
         # preview
-        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.3), cv2.COLORMAP_JET)
-        image = np.hstack((color_image, depth_colormap))
-        text = f'Frame: {frame_num}, Time: {datetime.fromtimestamp(timestamp).strftime("%H:%M:%S.%f")}'
-        image = cv2.putText(image, text, (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), thickness=2)
-        cv2.imshow(f'{camera_name}', image)
-        cv2.waitKey(1)
+        if preview:
+            depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.3), cv2.COLORMAP_JET)
+            image = np.hstack((color_image, depth_colormap))
+            text = f'Frame: {frame_num}, Time: {datetime.fromtimestamp(timestamp).strftime("%H:%M:%S.%f")}'
+            image = cv2.putText(image, text, (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), thickness=2)
+            cv2.imshow(f'{camera_name}', image)
+            cv2.waitKey(1)
 
         frame_num += 1
 
@@ -86,16 +88,36 @@ def unzip_bag(bag_path):
         json.dump(dict_i_time, file)
 
 
-def unzip_bags(scene_name):
+def unzip_bags(scene_name, preview=True):
     bag_paths = glob.glob(f'{dataset_path}/{scene_name}/*.bag')
     print(len(bag_paths), 'have been found:')
     print(bag_paths)
 
-    multiprocessing.set_start_method('spawn')
     with Pool() as pool:
-        pool.map(unzip_bag, bag_paths)
+        pool.map(partial(unzip_bag, preview=False), bag_paths)
 
 
 if __name__ == '__main__':
-    scene_name = 'scene_2303102008'
-    unzip_bags(scene_name)
+    multiprocessing.set_start_method('spawn')
+
+    scene_names = ['scene_230313171700',
+                   'scene_230313171800',
+                   'scene_230313171900',
+                   'scene_230313172000',
+                   'scene_230313172100',
+                   'scene_230313172200',
+                   'scene_230313172300',
+                   'scene_230313172537',
+                   'scene_230313172613',
+                   'scene_230313172659',
+                   'scene_230313172735',
+                   'scene_230313172808',
+                   'scene_230313172840',
+                   'scene_230313172915',
+                   'scene_230313172946',
+                   'scene_230313173036',
+                   'scene_230313173113',
+                   'scene_230313173153']
+    # scene_name = 'scene_2303102008'
+    for scene_name in scene_names:
+        unzip_bags(scene_name, preview=False)

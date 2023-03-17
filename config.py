@@ -32,8 +32,8 @@ ycb_model_names = [
     "052_extra_large_clamp",
     "061_foam_brick",
     "026_sponge",
-    "100_kitchen_sink",
-    "101_faucet_main",
+    "100_sink_unit",
+    "101_sink_only",
     "102_faucet_with_cap",
     "103_sink_only"
 ]
@@ -48,3 +48,8 @@ for model_name in ycb_model_names:
     obj_model_paths[obj_id] = f'{models_path}/{model_name}/textured_simple.obj'
     obj_texture_paths[obj_id] = f'{models_path}/{model_name}/texture_map.png'
     obj_ply_paths[obj_id] = f'{models_path}/{model_name}/object.ply'
+
+obj_ply_paths[101] = f'{models_path}/sink_unit/meshes/sink.STL'
+# obj_ply_paths[100] = f'{models_path}/024_bowl/object.ply'
+
+

@@ -170,7 +170,7 @@ class PointCloudWindow(Open3dWindow):
                     return gui.Widget.EventCallbackResult.HANDLED
         return gui.Widget.EventCallbackResult.HANDLED
 
-    def save_distances(self, save_file_path, dist_tres=0.01):
+    def save_distances(self, save_file_path, dist_tres=0.01, valid_infra_ids=[101]):
         detections = np.empty(0, dtype=[('frame', 'i4'),
                                         ('obj_id_1', 'i4'),
                                         ('obj_id_2', 'i4'),
@@ -179,7 +179,6 @@ class PointCloudWindow(Open3dWindow):
                                         ('distance', 'f')])
 
         for frame in tqdm(range(get_num_frame(self.scene_path))):
-        # for frame in tqdm(range(20)):
             self.frame_num = frame
             self.load_images()
             self.load_hand_masks()
@@ -197,17 +196,18 @@ class PointCloudWindow(Open3dWindow):
                                            np.array([(frame, obj_id, 0, 'obj-hand', 0, dist)], dtype=detections.dtype))
 
                 # obj-infra
-                for infra_id in self.ipt['obj_id']:
-                    infra_mesh = self.load_infra_mesh(infra_id)
-                    infra_pcd = infra_mesh.sample_points_uniformly(1000)
-                    dist = compute_pcds_dist(infra_pcd, obj_pcd)
-                    detections = np.append(detections,
-                                           np.array([(frame, obj_id, infra_id, 'obj-infra', 0, dist)],
-                                                    dtype=detections.dtype))
+                for infra_id in valid_infra_ids:
+                    if infra_id in self.ipt['obj_id']:
+                        infra_mesh = self.load_infra_mesh(infra_id)
+                        infra_pcd = infra_mesh.sample_points_uniformly(1000)
+                        dist = compute_pcds_dist(infra_pcd, obj_pcd)
+                        detections = np.append(detections,
+                                               np.array([(frame, obj_id, infra_id, 'obj-infra', 0, dist)],
+                                                        dtype=detections.dtype))
 
             # obj-infra
-            for infra_id in self.ipt['obj_id']:
-                if len(convex_hulls) > 0:
+            for infra_id in valid_infra_ids:
+                if infra_id in self.ipt['obj_id'] and len(convex_hulls) > 0:
                     infra_mesh = self.load_infra_mesh(infra_id)
                     infra_pcd = infra_mesh.sample_points_uniformly(1000)
                     dist = compute_pcds_dist(infra_pcd, hand_pcd)
@@ -278,19 +278,18 @@ def load_pcd_from_rgbd(rgb_img, depth_img, cam_K, extrinsic):
 
 
 def main():
-    scene_name = 'scene_2210232307_01'
-    start_image_num = 162
+    scene_name = 'scene_230310200800'
+    start_image_num = 0
     hand_mask_dir = 'hand_pose/d2/mask'
-    obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
-    infra_pose_file = 'object_pose/ground_truth/infra_poses.csv'
+    obj_pose_file = 'object_pose/multiview_medium_smooth/object_poses.csv'
+    infra_pose_file = 'infra_poses.csv'
 
     gui.Application.instance.initialize()
     w = PointCloudWindow(scene_name, start_image_num,
                          hand_mask_dir=hand_mask_dir, obj_pose_file=obj_pose_file, infra_pose_file=infra_pose_file)
-    # w.save_distances(f'{dataset_path}/{scene_name}/segmentation_points/point_cloud/obj_states.csv')
+    w.save_distances(f'{dataset_path}/{scene_name}/segmentation_points/point_cloud/obj_states.csv')
 
     gui.Application.instance.run()
-
 
 
 if __name__ == "__main__":

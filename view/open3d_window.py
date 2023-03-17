@@ -159,7 +159,8 @@ class Open3dWindow:
         meshes = {}
         for id, p in obj_ply_paths.items():
             geometry = o3d.io.read_triangle_mesh(p)
-            geometry = geometry.scale(0.001, geometry.get_center() / 1000)
+            if id != 101:
+                geometry = geometry.scale(0.001, geometry.get_center() / 1000)
             # geometry.points = o3d.utility.Vector3dVector(np.array(geometry.points) / 1000)
             meshes[id] = geometry
         return meshes
@@ -171,9 +172,9 @@ class Open3dWindow:
 
     def load_infra_mesh(self, infra_id):
         t = self.ipt[self.ipt['obj_id'] == infra_id]
-        return self.load_mesh(t, infra_id)
+        return self.load_mesh(t, infra_id, mm2m=False)
 
-    def load_mesh(self, table_rows, obj_id):
+    def load_mesh(self, table_rows, obj_id, mm2m=True):
         if len(table_rows) == 0:
             return None
         assert len(table_rows) == 1
@@ -181,8 +182,10 @@ class Open3dWindow:
 
         geometry = deepcopy(self.meshes[obj_id])
         pose = table_row['pose']
-        geometry.translate(pose[0:3, 3] / 1000)
-        center = pose[0:3, 3] / 1000
+        if mm2m:
+            pose[0:3, 3] /= 1000
+        geometry.translate(pose[0:3, 3])
+        center = pose[0:3, 3]
         geometry.rotate(pose[0:3, 0:3], center=center)
         return geometry
 
