@@ -1,15 +1,13 @@
 import csv
-from pprint import pprint
 
 import cv2
 import numpy as np
-import yaml
 from tqdm import tqdm
 
 from dataset_tools.config import dataset_path
-from dataset_tools.loaders import load_cameras_intrisics, load_cameras_extrinsics, get_num_frame, \
-    load_imgs_across_cameras, get_camera_names, intr2param, load_object_pose_table
-from dataset_tools.record.apriltag_detection import verify_calibration, detect_april_tag, draw_pose, draw_pose_axes
+from dataset_tools.loaders import load_cameras_intrisics, load_cameras_extrinsics, load_imgs_across_cameras, \
+    get_camera_names, intr2param, load_object_pose_table
+from dataset_tools.record.apriltag_detection import detect_april_tag, draw_pose, draw_pose_axes
 from dataset_tools.view.helpers import collage_imgs
 from dataset_tools.view.renderer import create_renderer, render_obj_pose, overlay_imgs, set_intrinsics
 
@@ -157,4 +155,3 @@ if __name__ == '__main__':
         extract_infra_pose(scene_name)
 
     # view_infra_pose(scene_name)
-
