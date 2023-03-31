@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from dataset_tools.config import dataset_path
 from dataset_tools.loaders import load_cameras_intrisics, load_cameras_extrinsics, get_num_frame, \
-    load_imgs_across_cameras, get_camera_names, intr2param
+    load_imgs_across_cameras, get_camera_names, intr2param, load_object_pose_table
 from dataset_tools.record.apriltag_detection import verify_calibration, detect_april_tag, draw_pose, draw_pose_axes
 from dataset_tools.view.helpers import collage_imgs
 from dataset_tools.view.renderer import create_renderer, render_obj_pose, overlay_imgs, set_intrinsics
@@ -85,8 +85,8 @@ def extract_infra_pose(scene_name, infra_tag_id=1, infra_tag_size=0.06):
 
 
 def load_infra_pose(scene_name):
-    with open(f'{dataset_path}/{scene_name}/infra_poses.yml') as file:
-        infra_pose = np.array(yaml.safe_load(file)['SINK_UNIT_ORIGIN']).reshape(4, 4)
+    ipt = load_object_pose_table(f"{dataset_path}/{scene_name}/infra_poses.csv", only_valid_pose=True)
+    infra_pose = ipt[ipt['obj_id'] == 100]['pose'][0]
     return infra_pose
 
 
