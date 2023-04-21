@@ -4,24 +4,23 @@ from copy import deepcopy
 
 import numpy as np
 import open3d as o3d
-
 from open3d.visualization import gui, rendering
 
 from dataset_tools.config import ycb_model_names, obj_model_names
 from dataset_tools.loaders import save_object_pose_table
 from dataset_tools.view.open3d_window import Open3dWindow
-from dataset_tools.view.point_cloud_simple import load_pcd_from_rgbd
+from dataset_tools.view.point_cloud import load_pcd_from_rgbd
 
 
 class Annotation(Open3dWindow):
-    def __init__(self, scene_name, init_frame_num, width=640*3+408, height=480*3, hand_mask_dir=None, obj_pose_file=None):
-        super().__init__(width, height, scene_name, 'Point Cloud', init_frame_num, obj_pose_file=obj_pose_file)
+    def __init__(self, scene_name, init_frame_num, width=640 * 3 + 408, height=480 * 3, init_obj_pose_file=None):
+        super().__init__(width, height, scene_name, 'Point Cloud', init_frame_num, obj_pose_file=init_obj_pose_file)
         em = self.window.theme.font_size
 
         self.window.set_on_key(self.on_keyboard_input)
 
-        self.dist = 0.05
-        self.deg = 30
+        self.dist = 0.005
+        self.deg = 1.
 
         self.left_shift_modifier = False
         self.annotation_changed = False
@@ -111,6 +110,7 @@ class Annotation(Open3dWindow):
                     mesh = self.load_obj_mesh(obj_id)
                     self.scene_widgets[i].scene.add_geometry(str(obj_id), mesh, self.settings.obj_material)
                 self.meshes_used.set_items([obj_model_names[i] for i in obj_ids])
+                self.meshes_used.selected_index = 0
             else:
                 self.meshes_used.set_items([])
                 self.objects.set_is_open(False)
@@ -145,13 +145,13 @@ class Annotation(Open3dWindow):
 
     def on_save_obj_pose(self):
         opt = self.opt[self.opt['obj_id'] < 99]
-        save_object_pose_table(opt, f'{self.scene_path}/object_pose/ground_truth/object_poses_tmp.csv')
+        save_object_pose_table(opt, f'{self.scene_path}/object_pose/ground_truth_tmp.csv')
         self.annotation_changed = False
         print('object pose saved')
 
     def on_save_infra_pose(self):
         ipt = self.opt[self.opt['obj_id'] > 99]
-        save_object_pose_table(ipt, f'{self.scene_path}/object_pose/ground_truth/infra_poses_tmp.csv')
+        save_object_pose_table(ipt, f'{self.scene_path}/infra_poses_tmp.csv')
         self.annotation_changed = False
         print('infrastructure pose saved')
 
@@ -159,8 +159,18 @@ class Annotation(Open3dWindow):
         if event.is_repeat:
             return True
 
+        # Change frame
+        if event.key == gui.KeyName.LEFT:
+            if event.type == gui.KeyEvent.DOWN:
+                self.on_previous_frame()
+            return True
+        if event.key == gui.KeyName.RIGHT:
+            if event.type == gui.KeyEvent.DOWN:
+                self.on_next_frame()
+            return True
+
         # Change camera view
-        if event.key >= 49 and event.key <= 56:
+        if 49 <= event.key <= 56:
             if event.type == gui.KeyEvent.DOWN:
                 view_id = event.key - 49
                 if view_id < len(self.camera_names):
@@ -186,11 +196,11 @@ class Annotation(Open3dWindow):
 
         if event.key == gui.KeyName.ALT:
             if event.type == gui.KeyEvent.DOWN:
-                self.dist = 0.005
-                self.deg = 1
-            elif event.type == gui.KeyEvent.UP:
                 self.dist = 0.05
                 self.deg = 30
+            elif event.type == gui.KeyEvent.UP:
+                self.dist = 0.005
+                self.deg = 1.
             return True
 
         # if no active_mesh selected print error
@@ -198,8 +208,16 @@ class Annotation(Open3dWindow):
             print("No objects are selected in scene meshes")
             return True
 
-        # Translation object
         if event.type == gui.KeyEvent.DOWN:
+            # copy from previous/next frame
+            if event.key == gui.KeyName.B:
+                print("B pressed: copy from previous frame")
+                self.copy_pose_from_frame(self.frame_num - 1)
+            elif event.key == gui.KeyName.N:
+                print("N pressed: copy from next frame")
+                self.copy_pose_from_frame(self.frame_num + 1)
+
+            # Translate object
             if not self.left_shift_modifier:
                 if event.key == gui.KeyName.J:
                     print("J pressed: translate to left")
@@ -287,15 +305,32 @@ class Annotation(Open3dWindow):
             w.scene.remove_geometry(str(obj_id))
             w.scene.add_geometry(str(obj_id), geometry, self.settings.obj_material)
 
+    def copy_pose_from_frame(self, src_frame_num):
+        self.annotation_changed = True
+
+        obj_id = int(self.meshes_used.selected_value[:3])
+
+        src_row = np.logical_and(self.opt['frame'] == src_frame_num, self.opt['obj_id'] == obj_id)
+        if not len(src_row.nonzero()[0] == 1):
+            print(f"Object {obj_id} not found in frame {src_frame_num}")
+            return
+        src_row = src_row.nonzero()[0][0]
+        queued_pose = self.opt[src_row]['pose']
+
+        dest_row = np.logical_and(self.opt['frame'] == self.frame_num, self.opt['obj_id'] == obj_id).nonzero()[0][0]
+        self.opt[dest_row]['pose'] = deepcopy(queued_pose)
+
+        self.update_frame()
+
 
 if __name__ == "__main__":
-    scene_name = 'scene_2303102008'
-    start_image_num = 0
+    scene_name = 'scene_230313173113'
+    start_image_num = 20
     hand_mask_dir = 'hand_pose/d2/mask'
-    obj_pose_file = 'object_pose/ground_truth.csv'
+    init_obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
+    # init_obj_pose_file = '../object_pose/ground_truth.csv'
 
     gui.Application.instance.initialize()
-    # w = Annotation(scene_name, start_image_num, obj_pose_file=obj_pose_file)
-    w = Annotation(scene_name, start_image_num)
+    w = Annotation(scene_name, start_image_num, init_obj_pose_file=init_obj_pose_file)
 
     gui.Application.instance.run()

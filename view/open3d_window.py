@@ -139,7 +139,7 @@ class Open3dWindow:
             self.depth_imgs[camera_name] = np.float32(depth_img * self.depth_scale)
 
     def on_next_frame(self):
-        self.frame_num = min(get_num_frame(self.scene_path), self.frame_num + 1)
+        self.frame_num = min(get_num_frame(self.scene_path) - 1, self.frame_num + 1)
         self.update_frame()
 
     def on_previous_frame(self):
@@ -181,7 +181,7 @@ class Open3dWindow:
         table_row = table_rows[0]
 
         geometry = deepcopy(self.meshes[obj_id])
-        pose = table_row['pose']
+        pose = deepcopy(table_row['pose'])
         if mm2m:
             pose[0:3, 3] /= 1000
         geometry.translate(pose[0:3, 3])

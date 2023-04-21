@@ -1,441 +1,295 @@
-"""
-Manual annotation tool with multiple views
-
-Using RGB, Depth and Models the tool will generate the "scene_gt.json" annotation file
-
-Other annotations can be generated usign other scripts [calc_gt_info.py, calc_gt_masks.py, ....]
-
-original repo: https://github.com/FLW-TUDO/3d_annotation_tool
-
-"""
 import argparse
 import json
 import os
 
 import cv2
 import numpy as np
+# from dataset_tools.view.open3ddev.geometry import BoundingConvexHull
 import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
+import pandas as pd
+from tqdm import tqdm
 
-from dataset_tools.config import dataset_path, ycb_model_names, obj_ply_paths
-from dataset_tools.loaders import load_intrinsics, get_depth_scale, get_camera_names, load_extrinsics
-
-
-# class AnnotationScene:
-#     def __init__(self, scene_point_cloud, image_num):
-#         self.annotation_scene = scene_point_cloud
-#         self.image_num = image_num
-#
-#         self.obj_list = list()
-#
-#     def add_obj(self, obj_geometry, obj_name, obj_instance, transform=np.identity(4)):
-#         self.obj_list.append(self.SceneObject(obj_geometry, obj_name, obj_instance, transform))
-#
-#     def get_objects(self):
-#         return self.obj_list[:]
-#
-#     class SceneObject:
-#         def __init__(self, obj_geometry, obj_name, obj_instance, transform):
-#             self.obj_geometry = obj_geometry
-#             self.obj_name = obj_name
-#             self.obj_instance = obj_instance
-#             self.transform = transform
+from dataset_tools.config import dataset_path, ycb_model_names, obj_ply_paths, resolution_width, resolution_height
+from dataset_tools.loaders import load_intrinsics, get_depth_scale, get_camera_names, load_extrinsics, get_num_frame, \
+    load_object_pose_table
+from dataset_tools.view.open3d_window import Open3dWindow
 
 
-class Settings:
-    UNLIT = "defaultUnlit"
+class PointCloudWindow(Open3dWindow):
+    def __init__(self, scene_name, init_frame_num, width=640*3+408, height=480*3, hand_mask_dir=None,
+                 obj_pose_file=None, infra_pose_file=None):
+        super().__init__(width, height, scene_name, 'Point Cloud', init_frame_num, obj_pose_file, infra_pose_file)
+        self.frame_num = init_frame_num
+        self.update_frame_label()
+        em = self.window.theme.font_size
 
-    def __init__(self):
-        self.bg_color = gui.Color(1, 1, 1)
-        self.show_axes = False
-        self.highlight_obj = True
+        self.scene_widget = gui.SceneWidget()
+        self.scene_widget.scene = rendering.Open3DScene(self.window.renderer)
+        self.window.add_child(self.scene_widget)
+        self.scene_widget.set_on_key(self.on_keyboard_input)
 
-        self.apply_material = True  # clear to False after processing
+        self.window.set_on_layout(self.on_layout)
 
-        self.scene_material = rendering.MaterialRecord()
-        self.scene_material.base_color = [0.9, 0.9, 0.9, 1.0]
-        self.scene_material.shader = Settings.UNLIT
+        # mask
+        self.hand_mask_dir = hand_mask_dir
+        self.hand_mask_box = gui.Checkbox(f'Apply Masks')
+        if hand_mask_dir is not None:
+            self.hand_masks = {}
+            self.view_ctrls.add_child(gui.Label(hand_mask_dir))
+            self.hand_mask_box.set_on_checked(self.update_frame)
+            self.view_ctrls.add_child(self.hand_mask_box)
 
-        self.annotation_obj_material = rendering.MaterialRecord()
-        self.annotation_obj_material.base_color = [0.9, 0.3, 0.3, 1.0]
-        self.annotation_obj_material.shader = Settings.UNLIT
+            # intersection
+            self.hand_mask_intsct_box = gui.Checkbox(f'Intersect Masks')
+            self.hand_mask_intsct_box.set_on_checked(self.update_frame)
+            self.view_ctrls.add_child(self.hand_mask_intsct_box)
+            self.hand_mask_intsct_convex_hull_box = gui.Checkbox(f'Show convex hull')
+            self.hand_mask_intsct_convex_hull_box.set_on_checked(self.update_frame)
+            self.view_ctrls.add_child(self.hand_mask_intsct_convex_hull_box)
+            self.view_ctrls.add_child(gui.Label(""))
 
+        # select camera views
+        self.view_ctrls.add_child(gui.Label("Active Cameras"))
+        self.selected_cameras = []
+        grid = gui.VGrid(2, 0.25 * em)
+        self.view_ctrls.add_child(grid)
+        for i in [0, 4, 1, 5, 2, 6, 3, 7]:
+            box = gui.Checkbox(f'camera {i+1:02d}')
+            box.checked = True
+            box.set_on_checked(self.update_frame)
+            grid.add_child(box)
+            self.selected_cameras.append((i, box))
 
-class AppWindow:
-    MENU_OPEN = 1
-    MENU_EXPORT = 2
-    MENU_QUIT = 3
-    MENU_SHOW_SETTINGS = 11
-    MENU_ABOUT = 21
+        self.update_frame()
+        self.set_active_camera_view()
 
-    MATERIAL_NAMES = ["Unlit"]
-    MATERIAL_SHADERS = [
-        Settings.UNLIT
-    ]
-
-    def _apply_settings(self):
-        bg_color = [
-            self.settings.bg_color.red, self.settings.bg_color.green,
-            self.settings.bg_color.blue, self.settings.bg_color.alpha
-        ]
-        self.pc_scene_widget.scene.set_background(bg_color)
-
-        if self.settings.apply_material:
-            self.pc_scene_widget.scene.modify_geometry_material("annotation_scene", self.settings.scene_material)
-            self.settings.apply_material = False
-
-        self._highlight_obj.checked = self.settings.highlight_obj
-        self._point_size.double_value = self.settings.scene_material.point_size
-
-    def _on_layout(self, layout_context):
+    def on_layout(self, layout_context):
         r = self.window.content_rect
         width = 17 * layout_context.theme.font_size
-        height = min(
-            r.height,
-            self._settings_panel.calc_preferred_size(
-                layout_context, gui.Widget.Constraints()).height)
-        self._settings_panel.frame = gui.Rect(r.get_right() - width, r.y, width, height)
-        self.pc_scene_widget.frame = gui.Rect(0, r.y, r.get_right() - width, r.height)
+        height = max(r.height,
+                     self.settings_panel.calc_preferred_size(layout_context, gui.Widget.Constraints()).height)
+        self.settings_panel.frame = gui.Rect(r.get_right() - width, r.y, width, height)
+        self.scene_widget.frame = gui.Rect(0, r.y, r.get_right() - width, r.height)
 
-    def __init__(self, width, height, scene_path):
-        self.active_camera_view = 0
-        self.pre_load_meshes = {}
-        self.camera_names = sorted(get_camera_names(scene_path))
-        self.extrinsics = load_extrinsics(f'{scene_path}/extrinsics.yml')
-        self.rgb_imgs = []
-        self.active_objs_pose = {}
-        self.scene_path = scene_path
-        self.settings = Settings()
+    def on_point_size(self, size):
+        self.settings.pcd_material.point_size = int(size)
+        self.scene_widget.scene.modify_geometry_material("pcd", self.settings.pcd_material)
 
-        # 3D widget
-        self.window = gui.Application.instance.create_window("View Point Cloud", width, height)
-        w = self.window  # to make the code more concise
+    def set_active_camera_view(self):
+        camera_name = self.camera_names[self.active_camera_view]
+        intrinsic = self.intrinsics[camera_name]
+        extrinsic = self.extrinsics[camera_name]
+        self.scene_widget.setup_camera(intrinsic, extrinsic, 640, 480, self.bounds)
 
-        self.pc_scene_widget = gui.SceneWidget()
-        self.pc_scene_widget.scene = rendering.Open3DScene(self.window.renderer)
-        self.window.add_child(self.pc_scene_widget)
+    def load_pcds(self):
+        pcds = o3d.geometry.PointCloud()
+        for camera_name in self.get_selected_camera_names():
+            intrinsic = self.intrinsics[camera_name]
+            extrinsic = self.extrinsics[camera_name]
+            rgb_img = self.rgb_imgs[camera_name]
+            depth_img = self.depth_imgs[camera_name]
 
-        # ---- Settings panel ----
-        em = w.theme.font_size
+            if self.hand_mask_box.checked:
+                mask = self.hand_masks[camera_name]
+                rgb_img = cv2.bitwise_and(rgb_img, rgb_img, mask=mask)
+                depth_img = cv2.bitwise_and(depth_img, depth_img, mask=mask)
 
-        self._settings_panel = gui.Vert(0, gui.Margins(0.25 * em, 0.25 * em, 0.25 * em, 0.25 * em))
+            pcds += load_pcd_from_rgbd(rgb_img, depth_img, intrinsic, extrinsic)
+        return pcds
 
-        view_ctrls = gui.CollapsableVert("View control", 0, gui.Margins(em, 0, 0, 0))
-        view_ctrls.set_is_open(True)
+    def load_hand_masks(self):
+        for camera_name in self.camera_names:
+            mask_path = f'{self.scene_path}/{camera_name}/{self.hand_mask_dir}/{self.frame_num:06}.png'
+            if os.path.exists(mask_path):
+                self.hand_masks[camera_name] = cv2.imread(mask_path, 0)
+            else:
+                self.hand_masks[camera_name] = np.zeros((resolution_height, resolution_width)).astype('uint8')
 
-        self._highlight_obj = gui.Checkbox("Highligh annotation objects")
-        self._highlight_obj.set_on_checked(self._on_highlight_obj)
-        view_ctrls.add_child(self._highlight_obj)
+    def load_convex_hulls_ls(self):
+        hulls = []
+        hull_lss = []
+        for camera_name in self.get_selected_camera_names():
+            intrinsic = self.intrinsics[camera_name]
+            extrinsic = self.extrinsics[camera_name]
+            mask = self.hand_masks[camera_name]
+            if mask.max() == 0:
+                continue
+            hull, hull_ls = compute_convex_hull_line_set_from_mask(mask, intrinsic, extrinsic)
+            if hull is not None:
+                hulls.append(hull)
+                hull_lss.append(hull_ls)
+        return hulls, hull_lss
 
-        self._point_size = gui.Slider(gui.Slider.INT)
-        self._point_size.set_limits(1, 5)
-        self._point_size.set_on_value_changed(self._on_point_size)
+    def update_frame(self, arg=None):
+        self.scene_widget.scene.clear_geometry()
+        self.update_frame_label()
+        self.load_images()
+        self.load_hand_masks()
+        pcd = self.load_pcds()
 
-        grid = gui.VGrid(2, 0.25 * em)
-        grid.add_child(gui.Label("Point size"))
-        grid.add_child(self._point_size)
-        view_ctrls.add_child(grid)
+        if self.hand_mask_intsct_box.checked:
+            convex_hulls, hull_lss = self.load_convex_hulls_ls()
+            pcd = crop_pcd_by_convex_hulls(pcd, convex_hulls)
+            if self.hand_mask_intsct_convex_hull_box.checked:
+                for i, hull_ls in enumerate(hull_lss):
+                    self.scene_widget.scene.add_geometry(f"hull_{i}", hull_ls, self.settings.line_set_material)
 
-        self._settings_panel.add_child(view_ctrls)
-        # ----
+        self.bounds = pcd.get_axis_aligned_bounding_box()
+        self.scene_widget.scene.add_geometry("pcd", pcd, self.settings.pcd_material)
 
-        w.set_on_layout(self._on_layout)
-        w.add_child(self._settings_panel)
+        # add objs
+        if self.obj_pose_box.checked:
+            for obj_id in self.opt[self.opt['frame'] == self.frame_num]['obj_id']:
+                mesh = self.load_obj_mesh(obj_id)
+                self.scene_widget.scene.add_geometry(str(obj_id), mesh, self.settings.obj_material)
 
-        # 3D Annotation tool options
-        annotation_objects = gui.CollapsableVert("Annotation Objects", 0.33 * em, gui.Margins(em, 0, 0, 0))
-        annotation_objects.set_is_open(True)
-        self._meshes_available = gui.ListView()
-        self._meshes_used = gui.ListView()
+        if self.infra_pose_box.checked:
+            for obj_id in self.ipt['obj_id']:
+                mesh = self.load_infra_mesh(obj_id)
+                self.scene_widget.scene.add_geometry(str(obj_id), mesh, self.settings.obj_material)
 
-        self._scene_control = gui.CollapsableVert("Scene Control", 0.33 * em, gui.Margins(em, 0, 0, 0))
-        self._scene_control.set_is_open(True)
+    def get_selected_camera_names(self):
+        active_camera_ids = []
+        for i, box in self.selected_cameras:
+            if box.checked:
+                active_camera_ids.append(i)
+        return np.array(self.camera_names)[active_camera_ids]
 
-        self._images_buttons_label = gui.Label("Images:")
+    def on_keyboard_input(self, event):
+        if event.is_repeat:
+            return gui.Widget.EventCallbackResult.HANDLED
 
-        self._pre_image_button = gui.Button("Previous Image")
-        self._pre_image_button.horizontal_padding_em = 0.8
-        self._pre_image_button.vertical_padding_em = 0
-        self._pre_image_button.set_on_clicked(self._on_previous_image)
-        self._next_image_button = gui.Button("Next Image")
-        self._next_image_button.horizontal_padding_em = 0.8
-        self._next_image_button.vertical_padding_em = 0
-        self._next_image_button.set_on_clicked(self._on_next_image)
+        # Change camera view
+        if event.key >= 49 and event.key <= 56:
+            if event.type == gui.KeyEvent.DOWN:
+                view_id = event.key - 49
+                if view_id < len(self.camera_names):
+                    self.on_change_active_camera_view(view_id)
+                    return gui.Widget.EventCallbackResult.HANDLED
+        return gui.Widget.EventCallbackResult.HANDLED
 
-        # 2 rows for sample and scene control
-        h = gui.Horiz(0.4 * em)  # row 2
-        h.add_stretch()
-        self._scene_control.add_child(h)
-        self._view_numbers = gui.Horiz(0.4 * em)
-        self._image_number = gui.Label("Image: " + f'{0:06}')
-        self._view_numbers.add_child(self._image_number)
-        self._scene_control.add_child(self._view_numbers)
+    def save_distances(self, save_file_path, dist_tres=0.01, valid_infra_ids=[101]):
+        detections = np.empty(0, dtype=[('frame', 'i4'),
+                                        ('obj_id_1', 'i4'),
+                                        ('obj_id_2', 'i4'),
+                                        ('relationship', 'U20'),
+                                        ('in_contact', 'i1'),
+                                        ('distance', 'f')])
 
-        h = gui.Horiz(0.4 * em)  # row 1
-        h.add_stretch()
-        # h.add_child(self._images_buttons_label)
-        h.add_child(self._pre_image_button)
-        h.add_child(self._next_image_button)
-        h.add_stretch()
-        self._scene_control.add_child(h)
+        for frame in tqdm(range(get_num_frame(self.scene_path))):
+            self.frame_num = frame
+            self.load_images()
+            self.load_hand_masks()
+            pcd = self.load_pcds()
+            convex_hulls, hull_lss = self.load_convex_hulls_ls()
+            hand_pcd = crop_pcd_by_convex_hulls(pcd, convex_hulls)
 
-        self._settings_panel.add_child(self._scene_control)
+            for obj_id in self.opt[self.opt['frame'] == frame]['obj_id']:
+                obj_mesh = self.load_obj_mesh(obj_id)
+                obj_pcd = obj_mesh.sample_points_uniformly(1000)
+                # obj-hand
+                if len(convex_hulls) > 0:
+                    dist = compute_pcds_dist(hand_pcd, obj_pcd)
+                    detections = np.append(detections,
+                                           np.array([(frame, obj_id, 0, 'obj-hand', 0, dist)], dtype=detections.dtype))
 
-        # ---- Menu ----
-        if gui.Application.instance.menubar is None:
-            file_menu = gui.Menu()
-            file_menu.add_separator()
-            file_menu.add_item("Quit", AppWindow.MENU_QUIT)
-            settings_menu = gui.Menu()
-            settings_menu.set_checked(AppWindow.MENU_SHOW_SETTINGS, True)
-            help_menu = gui.Menu()
-            help_menu.add_item("About", AppWindow.MENU_ABOUT)
+                # obj-infra
+                for infra_id in valid_infra_ids:
+                    if infra_id in self.ipt['obj_id']:
+                        infra_mesh = self.load_infra_mesh(infra_id)
+                        infra_pcd = infra_mesh.sample_points_uniformly(1000)
+                        dist = compute_pcds_dist(infra_pcd, obj_pcd)
+                        detections = np.append(detections,
+                                               np.array([(frame, obj_id, infra_id, 'obj-infra', 0, dist)],
+                                                        dtype=detections.dtype))
 
-            menu = gui.Menu()
-            menu.add_menu("File", file_menu)
-            menu.add_menu("Help", help_menu)
-            gui.Application.instance.menubar = menu
+            # obj-infra
+            for infra_id in valid_infra_ids:
+                if infra_id in self.ipt['obj_id'] and len(convex_hulls) > 0:
+                    infra_mesh = self.load_infra_mesh(infra_id)
+                    infra_pcd = infra_mesh.sample_points_uniformly(1000)
+                    dist = compute_pcds_dist(infra_pcd, hand_pcd)
+                    detections = np.append(detections,
+                                           np.array([(frame, infra_id, 0, 'infra-hand', 0, dist)],
+                                                    dtype=detections.dtype))
 
-        w.set_on_menu_item_activated(AppWindow.MENU_QUIT, self._on_menu_quit)
-        w.set_on_menu_item_activated(AppWindow.MENU_ABOUT, self._on_menu_about)
-        # ----
+        detections['in_contact'][detections['distance'] < dist_tres] = 1
 
-        # ---- annotation tool settings ----
-        self._on_point_size(1)  # set default size to 1
+        os.makedirs(os.path.dirname(save_file_path), exist_ok=True)
+        df = pd.DataFrame.from_records(detections)
+        df = df.sort_values(by=['obj_id_1', 'obj_id_2', 'frame'])
+        df.to_csv(save_file_path, index=False)
+        print(f'distances saved to {save_file_path}')
 
-        self._apply_settings()
 
-        self._annotation_scene = None
+def compute_pcds_dist(pcd1, pcd2):
+    return min(pcd1.compute_point_cloud_distance(pcd2))
 
-    def _update_img_numbers(self):
-        self._image_number.text = "Image: " + f'{self._annotation_scene.image_num:06}'
 
-    def _on_highlight_obj(self, light):
-        self.settings.highlight_obj = light
-        if light:
-            self.settings.annotation_obj_material.base_color = [0.9, 0.3, 0.3, 1.0]
-        elif not light:
-            self.settings.annotation_obj_material.base_color = [0.9, 0.9, 0.9, 1.0]
+def crop_pcd_by_convex_hulls(pcd, convex_hulls):
+    for hull in convex_hulls:
+        pcd = pcd.crop_convex_hull(hull)
+    return pcd
 
-        self._apply_settings()
 
-        # update current object visualization
-        meshes = self._annotation_scene.get_objects()
-        for mesh in meshes:
-            self.pc_scene_widget.scene.modify_geometry_material(mesh.obj_name, self.settings.annotation_obj_material)
+def compute_convex_hull_line_set_from_mask(mask, intrinsic, extrinsic, min_d=0.1, max_d=2.0,
+                                           boundrary_thres=5, area_thres=0.25):
+    if np.sum(mask > 0) / mask.size > 0.25:
+        return None, None
 
-    def _on_point_size(self, size):
-        self.settings.scene_material.point_size = int(size)
-        self.settings.apply_material = True
-        self._apply_settings()
+    h, w = mask.shape
+    pts = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    pts = pts[0][0].reshape((-1, 2))
 
-    def _on_menu_quit(self):
-        gui.Application.instance.quit()
+    if (pts[:, 0] < boundrary_thres).any() or (pts[:, 0] > resolution_height - boundrary_thres).any() \
+            or (pts[:, 1] < boundrary_thres).any() or (pts[:, 1] > resolution_width - boundrary_thres).any():
+        return None, None
 
-    def _on_menu_about(self):
-        # Show a simple dialog. Although the Dialog is actually a widget, you can
-        # treat it similar to a Window for layout and put all the widgets in a
-        # layout which you make the only child of the Dialog.
-        em = self.window.theme.font_size
-        dlg = gui.Dialog("About")
+    rgb = np.zeros((h, w, 3)).astype('uint8')
 
-        # Add the text
-        dlg_layout = gui.Vert(em, gui.Margins(em, em, em, em))
-        dlg_layout.add_child(gui.Label("BOP manual annotation tool"))
+    depth_min = np.zeros((h, w)).astype('float32')
+    depth_min[pts[:, 1], pts[:, 0]] = min_d
+    depth_max = np.zeros((h, w)).astype('float32')
+    depth_max[pts[:, 1], pts[:, 0]] = max_d
 
-        # Add the Ok button. We need to define a callback function to handle
-        # the click.
-        ok = gui.Button("OK")
-        ok.set_on_clicked(self._on_about_ok)
+    pcd_crop = load_pcd_from_rgbd(rgb, depth_min, intrinsic, extrinsic)
+    pcd_crop += load_pcd_from_rgbd(rgb, depth_max, intrinsic, extrinsic)
 
-        # We want the Ok button to be an the right side, so we need to add
-        # a stretch item to the layout, otherwise the button will be the size
-        # of the entire row. A stretch item takes up as much space as it can,
-        # which forces the button to be its minimum size.
-        h = gui.Horiz()
-        h.add_stretch()
-        h.add_child(ok)
-        h.add_stretch()
-        dlg_layout.add_child(h)
+    hull, _ = pcd_crop.compute_convex_hull()
+    hull_ls = o3d.geometry.LineSet.create_from_triangle_mesh(hull)
+    hull_ls.paint_uniform_color((1, 0, 0))
 
-        dlg.add_child(dlg_layout)
-        self.window.show_dialog(dlg)
+    hull = o3d.geometry.BoundingConvexHull(pcd_crop)
+    return hull, hull_ls
 
-    def _on_about_ok(self):
-        self.window.close_dialog()
 
-    def _obj_instance_count(self, mesh_to_add, meshes):
-        types = [i[:-2] for i in meshes]  # remove last 3 character as they present instance number (OBJ_INSTANCE)
-        equal_values = [i for i in range(len(types)) if types[i] == mesh_to_add]
-        count = 0
-        if len(equal_values):
-            indices = np.array(meshes)
-            indices = indices[equal_values]
-            indices = [int(x[-1]) for x in indices]
-            count = max(indices) + 1
-        return count
+def load_pcd_from_rgbd(rgb_img, depth_img, cam_K, extrinsic):
+    rgb_img_o3d = o3d.geometry.Image(cv2.cvtColor(rgb_img, cv2.COLOR_BGR2RGB))
+    depth_img_o3d = o3d.geometry.Image(depth_img)
 
-    def _make_point_cloud(self, rgb_img, depth_img, cam_K):
-        # convert images to open3d types
-        rgb_img_o3d = o3d.geometry.Image(cv2.cvtColor(rgb_img, cv2.COLOR_BGR2RGB))
-        depth_img_o3d = o3d.geometry.Image(depth_img)
-
-        # convert image to point cloud
-        intrinsic = o3d.camera.PinholeCameraIntrinsic(rgb_img.shape[0], rgb_img.shape[1],
-                                                      cam_K[0, 0], cam_K[1, 1], cam_K[0, 2], cam_K[1, 2])
-        rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(rgb_img_o3d, depth_img_o3d,
-                                                                  depth_scale=1, convert_rgb_to_intensity=False)
-        pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, intrinsic)
-
-        return pcd
-
-    def scene_load(self, image_num):
-        self._annotation_changed = False
-
-        self.pc_scene_widget.scene.clear_geometry()
-        geometry = None
-
-        cam_K = load_intrinsics(f'{self.scene_path}/{self.camera_names[0]}/camera_meta.yml')
-        depth_scale = get_depth_scale(f'{self.scene_path}/{self.camera_names[0]}/camera_meta.yml', convert2unit='m')
-
-        rgb_path = os.path.join(self.scene_path, f'{self.camera_names[0]}', 'rgb', f'{image_num:06}' + '.png')
-        rgb_img = cv2.imread(rgb_path)
-        depth_path = os.path.join(self.scene_path, f'{self.camera_names[0]}', 'depth', f'{image_num:06}' + '.png')
-        depth_img = cv2.imread(depth_path, -1)
-        depth_img = np.float32(depth_img * depth_scale)
-
-        self.rgb_imgs = []
-        for camera in self.camera_names:
-            rgb_path = os.path.join(self.scene_path, camera, 'rgb', f'{image_num:06}' + '.png')
-            self.rgb_imgs.append(cv2.imread(rgb_path))
-
-        try:
-            geometry = self._make_point_cloud(rgb_img, depth_img, cam_K)
-        except Exception:
-            print("Failed to load scene.")
-
-        if geometry is not None:
-            print("[Info] Successfully read scene ", image_num)
-            if not geometry.has_normals():
-                geometry.estimate_normals()
-            geometry.normalize_normals()
-        else:
-            print("[WARNING] Failed to read points")
-
-        try:
-            self.pc_scene_widget.scene.add_geometry("annotation_scene", geometry, self.settings.scene_material,
-                                                    add_downsampled_copy_for_fast_rendering=True)
-            bounds = geometry.get_axis_aligned_bounding_box()
-            self.pc_scene_widget.setup_camera(60, bounds, bounds.get_center())
-            center = np.array([0, 0, 0])
-            eye = center + np.array([0, 0, -0.5])
-            up = np.array([0, -1, 0])
-            self.pc_scene_widget.look_at(center, eye, up)
-
-            # self._annotation_scene = AnnotationScene(geometry, image_num)
-            self._meshes_used.set_items([])  # clear list from last loaded scene
-
-            # load values if an annotation already exists
-            self._load_annotation(image_num)
-
-        except Exception as e:
-            print(e)
-
-        self._update_img_numbers()
-
-    def _load_annotation(self, image_num):
-        scene_gt_path = os.path.join(self.scene_path, f'{self.camera_names[0]}', 'scene_gt.json')
-        with open(scene_gt_path) as scene_gt_file:
-            data = json.load(scene_gt_file)
-            if str(image_num) not in data.keys():
-                print(f'No gt in image {image_num}')
-                return
-            scene_data = data[str(image_num)]
-            for obj in scene_data:
-                # add object to annotation_scene object
-                obj_geometry = o3d.io.read_point_cloud(obj_ply_paths[int(obj['obj_id'])])
-                obj_geometry.points = o3d.utility.Vector3dVector(
-                    np.array(obj_geometry.points) / 1000)  # convert mm to meter
-                model_name = ycb_model_names[int(obj['obj_id']) - 1]
-                meshes = self._annotation_scene.get_objects()  # update list after adding current object
-                meshes = [i.obj_name for i in meshes]
-                obj_instance = self._obj_instance_count(model_name, meshes)
-                obj_name = model_name + '_' + str(obj_instance)
-                translation = np.array(np.array(obj['cam_t_m2c']), dtype=np.float64) / 1000  # convert to meter
-                orientation = np.array(np.array(obj['cam_R_m2c']), dtype=np.float64)
-                transform = np.concatenate((orientation.reshape((3, 3)), translation.reshape(3, 1)), axis=1)
-                transform_cam_to_obj = np.concatenate(
-                    (transform, np.array([0, 0, 0, 1]).reshape(1, 4)))  # homogeneous transform
-
-                self._annotation_scene.add_obj(obj_geometry, obj_name, obj_instance, transform_cam_to_obj)
-                # adding object to the scene
-                obj_geometry.translate(transform_cam_to_obj[0:3, 3])
-                center = obj_geometry.get_center()
-                obj_geometry.rotate(transform_cam_to_obj[0:3, 0:3], center=center)
-                self.pc_scene_widget.scene.add_geometry(obj_name, obj_geometry, self.settings.annotation_obj_material,
-                                                        add_downsampled_copy_for_fast_rendering=True)
-                # active_meshes.append(obj_name)
-                self.active_objs_pose[obj_name] = (int(obj['obj_id']), transform_cam_to_obj)
-
-        meshes = self._annotation_scene.get_objects()  # update list after adding current object
-        meshes = [i.obj_name for i in meshes]
-        self._meshes_used.set_items(meshes)
-
-    def update_obj_list(self):
-        self._meshes_available.set_items(ycb_model_names)
-
-    def _on_next_image(self):
-        if self._annotation_scene.image_num + 1 >= len(
-                next(os.walk(os.path.join(self.scene_path, f'{self.camera_names[0]}', 'depth')))[
-                    2]):  # 2 for files which here are the how many depth images
-            self._on_error("There is no next image.")
-            return
-        self.scene_load(self._annotation_scene.image_num + 1)
-
-    def _on_previous_image(self):
-        if self._annotation_scene.image_num - 1 < 0:
-            self._on_error("There is no image number before image 0.")
-            return
-        self.scene_load(self._annotation_scene.image_num - 1)
-
-    def _on_error(self, err_msg):
-        dlg = gui.Dialog("Error")
-
-        em = self.window.theme.font_size
-        dlg_layout = gui.Vert(em, gui.Margins(em, em, em, em))
-        dlg_layout.add_child(gui.Label(err_msg))
-
-        ok = gui.Button("OK")
-        ok.set_on_clicked(self._on_about_ok)
-
-        h = gui.Horiz()
-        h.add_stretch()
-        h.add_child(ok)
-        h.add_stretch()
-        dlg_layout.add_child(h)
-
-        dlg.add_child(dlg_layout)
-        self.window.show_dialog(dlg)
+    intrinsic = o3d.camera.PinholeCameraIntrinsic(rgb_img.shape[0], rgb_img.shape[1],
+                                                  cam_K[0, 0], cam_K[1, 1], cam_K[0, 2], cam_K[1, 2])
+    rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(rgb_img_o3d, depth_img_o3d,
+                                                              depth_scale=1, convert_rgb_to_intensity=False)
+    pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, intrinsic, extrinsic)
+    return pcd
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Annotation tool.')
-    parser.add_argument('--scene_name', default='scene_2210232307_01')
-    parser.add_argument('--start_frame', type=int, default=20)
-
-    args = parser.parse_args()
-    scene_name = args.scene_name
-    scene_path = f'{dataset_path}/{scene_name}'
-    start_image_num = args.start_frame
+    scene_name = 'scene_230313172100'
+    start_image_num = 0
+    hand_mask_dir = 'hand_pose/d2/mask'
+    # obj_pose_file = 'object_pose/multiview_medium_smooth/object_poses.csv'
+    obj_pose_file = '../object_pose/ground_truth.csv'
+    infra_pose_file = 'infra_poses.csv'
 
     gui.Application.instance.initialize()
-    w = AppWindow(2048, 1536, scene_path)
+    w = PointCloudWindow(scene_name, start_image_num,
+                         hand_mask_dir=hand_mask_dir, obj_pose_file=obj_pose_file, infra_pose_file=infra_pose_file)
+    # w.save_distances(f'{dataset_path}/{scene_name}/segmentation_points/point_cloud/obj_states.csv')
 
-    w.scene_load(start_image_num)
-    w.update_obj_list()
-
-    # Run the event loop. This will not return until the last window is closed.
     gui.Application.instance.run()
 
 
