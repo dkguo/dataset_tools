@@ -133,6 +133,7 @@ def load_object_pose_table(file_path, only_valid_pose=False, fill_nan=False):
         obj_pose_table (opt), numpy recarray
     """
     df = pd.read_csv(file_path, converters={'pose': lambda x: eval(f'np.array({x})')})
+    df = df.sort_values(by=['frame', 'obj_id'])
     if only_valid_pose:
         drop_idxs = []
         for i, pose in enumerate(df['pose']):

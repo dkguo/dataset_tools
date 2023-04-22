@@ -14,7 +14,7 @@ from tqdm import tqdm
 # from dataset_tools.bop_toolkit.bop_toolkit_lib import renderer
 # from dataset_tools.config import dataset_path
 from dataset_tools.loaders import get_camera_names, load_object_pose_table, load_all_opts
-from dataset_tools.view.videos import combine_videos
+from dataset_tools.view.helpers import combine_videos
 
 
 # def overlay_imgs(im1, im2, p1=0.5, p2=0.5):
