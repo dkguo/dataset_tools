@@ -184,6 +184,12 @@ def load_primitives_table(file_path):
     return pt
 
 
+def load_infra_pose(scene_name):
+    ipt = load_object_pose_table(f"{dataset_path}/{scene_name}/infra_poses.csv", only_valid_pose=True)
+    infra_pose = ipt[ipt['obj_id'] == 100]['pose'][0]
+    return infra_pose
+
+
 if __name__ == '__main__':
     # scene_path = '/home/gdk/data/1654267227_formated'
     # camera_names = get_camera_names(scene_path)
