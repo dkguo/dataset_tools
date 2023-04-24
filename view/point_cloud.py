@@ -1,26 +1,23 @@
-import argparse
-import json
 import os
 
 import cv2
 import numpy as np
-# from dataset_tools.view.open3ddev.geometry import BoundingConvexHull
 import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 import pandas as pd
 from tqdm import tqdm
 
-from dataset_tools.config import dataset_path, ycb_model_names, obj_ply_paths, resolution_width, resolution_height
-from dataset_tools.loaders import load_intrinsics, get_depth_scale, get_camera_names, load_extrinsics, get_num_frame, \
-    load_object_pose_table
+from dataset_tools.config import dataset_path, resolution_width, resolution_height
+from dataset_tools.loaders import get_num_frame
 from dataset_tools.view.open3d_window import Open3dWindow
 
 
 class PointCloudWindow(Open3dWindow):
-    def __init__(self, scene_name, init_frame_num, width=640*3+408, height=480*3, hand_mask_dir=None,
+    def __init__(self, scene_name, init_frame_num, width=640 * 3 + 408, height=480 * 3, hand_mask_dir=None,
                  obj_pose_file=None, infra_pose_file=None):
         super().__init__(width, height, scene_name, 'Point Cloud', init_frame_num, obj_pose_file, infra_pose_file)
+        self.bounds = None
         self.frame_num = init_frame_num
         self.update_frame_label()
         em = self.window.theme.font_size
@@ -56,7 +53,7 @@ class PointCloudWindow(Open3dWindow):
         grid = gui.VGrid(2, 0.25 * em)
         self.view_ctrls.add_child(grid)
         for i in [0, 4, 1, 5, 2, 6, 3, 7]:
-            box = gui.Checkbox(f'camera {i+1:02d}')
+            box = gui.Checkbox(f'camera {i + 1:02d}')
             box.checked = True
             box.set_on_checked(self.update_frame)
             grid.add_child(box)
@@ -162,7 +159,7 @@ class PointCloudWindow(Open3dWindow):
             return gui.Widget.EventCallbackResult.HANDLED
 
         # Change camera view
-        if event.key >= 49 and event.key <= 56:
+        if 49 <= event.key <= 56:
             if event.type == gui.KeyEvent.DOWN:
                 view_id = event.key - 49
                 if view_id < len(self.camera_names):
@@ -265,12 +262,12 @@ def compute_convex_hull_line_set_from_mask(mask, intrinsic, extrinsic, min_d=0.1
     return hull, hull_ls
 
 
-def load_pcd_from_rgbd(rgb_img, depth_img, cam_K, extrinsic):
+def load_pcd_from_rgbd(rgb_img, depth_img, intrisic, extrinsic):
     rgb_img_o3d = o3d.geometry.Image(cv2.cvtColor(rgb_img, cv2.COLOR_BGR2RGB))
     depth_img_o3d = o3d.geometry.Image(depth_img)
 
     intrinsic = o3d.camera.PinholeCameraIntrinsic(rgb_img.shape[0], rgb_img.shape[1],
-                                                  cam_K[0, 0], cam_K[1, 1], cam_K[0, 2], cam_K[1, 2])
+                                                  intrisic[0, 0], intrisic[1, 1], intrisic[0, 2], intrisic[1, 2])
     rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(rgb_img_o3d, depth_img_o3d,
                                                               depth_scale=1, convert_rgb_to_intensity=False)
     pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, intrinsic, extrinsic)
@@ -288,7 +285,7 @@ def main():
     gui.Application.instance.initialize()
     w = PointCloudWindow(scene_name, start_image_num,
                          hand_mask_dir=hand_mask_dir, obj_pose_file=obj_pose_file, infra_pose_file=infra_pose_file)
-    # w.save_distances(f'{dataset_path}/{scene_name}/segmentation_points/point_cloud/obj_states.csv')
+    w.save_distances(f'{dataset_path}/{scene_name}/segmentation_points/point_cloud/obj_states.csv')
 
     gui.Application.instance.run()
 
