@@ -182,7 +182,7 @@ def png2video(imgs_dir, frame_rate=30):
     out_video.release()
 
 
-def combine_videos(video_paths, save_path, speed=1):
+def combine_videos(video_paths, save_path, speed=1, video_shape=(2, -1)):
     clips = []
     for video_path in video_paths:
         print('Combining', video_path)
@@ -191,7 +191,7 @@ def combine_videos(video_paths, save_path, speed=1):
     if not os.path.exists(os.path.dirname(save_path)):
         os.makedirs(os.path.dirname(save_path))
 
-    final_clip = clips_array(np.reshape(clips, (2, -1)))
+    final_clip = clips_array(np.reshape(clips, video_shape))
     final_clip = final_clip.fx(vfx.speedx, speed)
     final_clip.write_videofile(save_path)
 
