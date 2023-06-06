@@ -275,17 +275,18 @@ def load_pcd_from_rgbd(rgb_img, depth_img, intrisic, extrinsic):
 
 
 def main():
-    scene_name = 'scene_230313171600'
+    scene_name = 'scene_230531164514'
     start_image_num = 200
     hand_mask_dir = 'hand_pose/d2/mask'
-    obj_pose_file = 'object_pose/multiview_medium_smooth/object_poses.csv'
+    obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
     # obj_pose_file = '../object_pose/ground_truth.csv'
-    infra_pose_file = 'infra_poses.csv'
+    # infra_pose_file = 'infra_poses.csv'
+    infra_pose_file = None
 
     gui.Application.instance.initialize()
     w = PointCloudWindow(scene_name, start_image_num,
                          hand_mask_dir=hand_mask_dir, obj_pose_file=obj_pose_file, infra_pose_file=infra_pose_file)
-    w.save_distances(f'{dataset_path}/{scene_name}/segmentation_points/point_cloud/obj_states.csv')
+    # w.save_distances(f'{dataset_path}/{scene_name}/segmentation_points/point_cloud/obj_states.csv')
 
     gui.Application.instance.run()
 

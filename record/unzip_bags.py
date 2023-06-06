@@ -94,30 +94,12 @@ def unzip_bags(scene_name, preview=True):
     print(bag_paths)
 
     with Pool() as pool:
-        pool.map(partial(unzip_bag, preview=False), bag_paths)
+        pool.map(partial(unzip_bag, preview=preview), bag_paths)
 
 
 if __name__ == '__main__':
     multiprocessing.set_start_method('spawn')
 
-    scene_names = ['scene_230313171700',
-                   'scene_230313171800',
-                   'scene_230313171900',
-                   'scene_230313172000',
-                   'scene_230313172100',
-                   'scene_230313172200',
-                   'scene_230313172300',
-                   'scene_230313172537',
-                   'scene_230313172613',
-                   'scene_230313172659',
-                   'scene_230313172735',
-                   'scene_230313172808',
-                   'scene_230313172840',
-                   'scene_230313172915',
-                   'scene_230313172946',
-                   'scene_230313173036',
-                   'scene_230313173113',
-                   'scene_230313173153']
-    # scene_name = 'scene_2303102008'
+    scene_names = ['scene_230531164514']
     for scene_name in scene_names:
         unzip_bags(scene_name, preview=False)

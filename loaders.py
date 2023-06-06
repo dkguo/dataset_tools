@@ -104,19 +104,25 @@ def load_cameras_meta(scene_name):
 
 
 def load_cameras_intrisics(scene_name):
-    cameras_meta = load_cameras_meta(scene_name)
-    cameras_intics = cameras_meta['INTRINSICS']
-    for camera_name, intri in cameras_intics.items():
-        cameras_intics[camera_name] = np.array(intri)
-    return cameras_intics
+    if os.path.exists(f'{dataset_path}/{scene_name}/cameras_meta.yml'):
+        cameras_meta = load_cameras_meta(scene_name)
+        cameras_intics = cameras_meta['INTRINSICS']
+        for camera_name, intri in cameras_intics.items():
+            cameras_intics[camera_name] = np.array(intri)
+        return cameras_intics
+    else:
+        cameras_intrinsics = {}
+        camera_names = get_camera_names(f'{dataset_path}/{scene_name}')
+        for camera_name in camera_names:
+            cameras_intrinsics[camera_name] = load_intrinsics(f'{dataset_path}/{scene_name}/{camera_name}/camera_meta.yml')
+        return cameras_intrinsics
 
 
 def load_cameras_extrinsics(scene_name):
-    cameras_meta = load_cameras_meta(scene_name)
-    cameras_exts = cameras_meta['EXTRINSICS']
-    for camera_name, ext in cameras_exts.items():
-        cameras_exts[camera_name] = np.array(ext)
-    return cameras_exts
+    if os.path.exists(f'{dataset_path}/{scene_name}/cameras_meta.yml'):
+        return load_extrinsics(f'{dataset_path}/{scene_name}/cameras_meta.yml')
+    else:
+        return load_extrinsics(f'{dataset_path}/{scene_name}/extrinsics.yml')
 
 
 def get_depth_scale(camera_meta_path, convert2unit='mm'):

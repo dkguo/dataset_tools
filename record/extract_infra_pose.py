@@ -91,25 +91,25 @@ def view_april_tag_pose(tag_pose, imgs, cameras_intr, camera_ext, tag_size):
     overlay = collage_imgs(overlays)
     cv2.imshow('orignal tags', overlay)
 
-    re_ims = []
-    renderer = create_renderer()
-    for img, intr, ext in zip(imgs, cameras_intr.values(), camera_ext.values()):
-        pose = np.linalg.inv(ext) @ tag_pose
-
-        set_intrinsics(renderer, intr)
-        rendered_im = render_obj_pose(renderer, [(4, pose)], unit='m')
-        rendered_im = overlay_imgs(img, rendered_im)
-        re_ims.append(rendered_im)
-
-        camera_params = intr2param(intr)
-        draw_pose(img, camera_params, tag_size, pose)
-        draw_pose_axes(img, camera_params, tag_size, pose)
-
-    preview = collage_imgs(imgs)
-    cv2.imshow('verify', preview)
-
-    preview = collage_imgs(re_ims)
-    cv2.imshow('verify 2', preview)
+    # re_ims = []
+    # renderer = create_renderer()
+    # for img, intr, ext in zip(imgs, cameras_intr.values(), camera_ext.values()):
+    #     pose = np.linalg.inv(ext) @ tag_pose
+    #
+    #     set_intrinsics(renderer, intr)
+    #     rendered_im = render_obj_pose(renderer, [(4, pose)], unit='m')
+    #     rendered_im = overlay_imgs(img, rendered_im)
+    #     re_ims.append(rendered_im)
+    #
+    #     camera_params = intr2param(intr)
+    #     draw_pose(img, camera_params, tag_size, pose)
+    #     draw_pose_axes(img, camera_params, tag_size, pose)
+    #
+    # preview = collage_imgs(imgs)
+    # cv2.imshow('verify', preview)
+    #
+    # preview = collage_imgs(re_ims)
+    # cv2.imshow('verify 2', preview)
     key = cv2.waitKey(0)
     if key & 0xFF == ord('q') or key == 27:
         cv2.destroyAllWindows()
@@ -125,27 +125,8 @@ def view_infra_pose(scene_name):
 
 
 if __name__ == '__main__':
-    # scene_names = ['scene_230310200800']
-
-    scene_names = ['scene_230313171600',
-                   'scene_230313171700',
-                   'scene_230313171800',
-                   'scene_230313171900',
-                   'scene_230313172000',
-                   'scene_230313172100',
-                   'scene_230313172200',
-                   'scene_230313172537',
-                   'scene_230313172613',
-                   'scene_230313172659',
-                   'scene_230313172735',
-                   'scene_230313172808',
-                   'scene_230313172840',
-                   'scene_230313172915',
-                   'scene_230313172946',
-                   'scene_230313173036',
-                   'scene_230313173113']
+    scene_names = ['scene_230531164514']
 
     for scene_name in scene_names:
         extract_infra_pose(scene_name)
-
-    # view_infra_pose(scene_name)
+        view_infra_pose(scene_name)

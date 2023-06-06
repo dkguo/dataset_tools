@@ -13,15 +13,7 @@ from dataset_tools.config import dataset_path, resolution_width, resolution_heig
 from dataset_tools.loaders import load_cameras_intrisics, load_cameras_extrinsics
 from dataset_tools.view.helpers import collage_imgs, add_border
 from dataset_tools.record.multical.multical.app.calibrate import Calibrate
-
-# settings
 from dataset_tools.record.apriltag_detection import verify_calibration
-
-frame_rate = 6  # fps
-num_frame_for_each_angle = 50
-vis_calibration = True
-scene_name = f'scene_{datetime.now().strftime("%y%m%d%H%M")}_ext'
-scene_path = f'{dataset_path}/{scene_name}'
 
 
 class Device:
@@ -31,16 +23,15 @@ class Device:
         self.pipeline_profile = pipeline_profile
 
 
-def create_folders():
+def create_folders(scene_path):
     """Create scene and camera folders"""
-    scene_path = f'{dataset_path}/{scene_name}'
     if os.path.exists(scene_path):
         shutil.rmtree(scene_path)
     os.mkdir(scene_path)
     print('Saving data to', scene_path)
 
 
-def calibration(scene_path=scene_path):
+def calibration(scene_path, vis_calibration=True):
     # Calibration
     parser = ArgumentParser(prog='multical')
     parser.add_arguments(Calibrate, dest="app")
@@ -56,7 +47,7 @@ def calibration(scene_path=scene_path):
     program.app.execute()
 
 
-def generate_cameras_meta(scene_path=scene_path):
+def generate_cameras_meta(scene_path, frame_rate):
     with open(f'{scene_path}/calibration.json') as f:
         info = json.load(f)
 
@@ -83,11 +74,20 @@ def generate_cameras_meta(scene_path=scene_path):
     with open(f'{scene_path}/cameras_meta.yml', 'w') as file:
         yaml.dump(meta, file)
 
+    with open(f'{scene_path}/extrinsics.json', 'w') as file:
+        yaml.dump(extrinsics, file)
+
     print('saved cameras_meta.yml')
 
 
 def main():
-    create_folders()
+    frame_rate = 6  # fps
+    num_frame_for_each_angle = 50
+    vis_calibration = True
+    scene_name = f'scene_{datetime.now().strftime("%y%m%d%H%M")}_ext'
+    scene_path = f'{dataset_path}/{scene_name}'
+
+    create_folders(scene_path)
 
     # Enable all devices
     rs_config = rs.config()
@@ -171,8 +171,8 @@ def main():
             print(f'Start recording {num_frame_for_each_angle} images for calibration...')
             calibrate = True
 
-    calibration()
-    generate_cameras_meta()
+    calibration(scene_path, vis_calibration)
+    generate_cameras_meta(scene_path, frame_rate)
 
     # verify calibration using april tag cube
     cameras_intr = load_cameras_intrisics(scene_name)
@@ -200,9 +200,4 @@ def main():
 
 
 if __name__ == '__main__':
-    # scene_name = 'scene_2211191054_ext'
-    # scene_path = f'{dataset_path}/{scene_name}'
-    # generate_cameras_meta(scene_path)
-
     main()
-    # calibration('/home/gdk/Data/kitchen_sink/scene_2211192303_ext')

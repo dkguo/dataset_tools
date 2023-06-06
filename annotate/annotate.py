@@ -324,11 +324,11 @@ class Annotation(Open3dWindow):
 
 
 if __name__ == "__main__":
-    scene_name = 'scene_230313171600'
-    start_image_num = 100
+    scene_name = 'scene_230531164514'
+    start_image_num = 328
     hand_mask_dir = 'hand_pose/d2/mask'
-    init_obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
-    # init_obj_pose_file = '../object_pose/ground_truth.csv'
+    # init_obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
+    init_obj_pose_file = '../object_pose/ground_truth.csv'
 
     gui.Application.instance.initialize()
     w = Annotation(scene_name, start_image_num, init_obj_pose_file=init_obj_pose_file)
