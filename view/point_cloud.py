@@ -1,3 +1,4 @@
+import glob
 import os
 
 import cv2
@@ -275,11 +276,11 @@ def load_pcd_from_rgbd(rgb_img, depth_img, intrisic, extrinsic):
 
 
 def main():
-    scene_name = 'scene_230531164514'
-    start_image_num = 200
+    scene_name = 'scene_230313171600'
+    start_image_num = 220
     hand_mask_dir = 'hand_pose/d2/mask'
-    obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
-    # obj_pose_file = '../object_pose/ground_truth.csv'
+    # obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
+    obj_pose_file = '../object_pose/ground_truth.csv'
     # infra_pose_file = 'infra_poses.csv'
     infra_pose_file = None
 
