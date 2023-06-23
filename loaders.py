@@ -162,11 +162,11 @@ def load_object_pose_table(file_path, only_valid_pose=False, fill_nan=False):
     return opt
 
 
-def save_object_pose_table(opt, file_path):
+def save_object_pose_table(opt, file_path, col_tolist='pose'):
     if not os.path.exists(os.path.dirname(file_path)):
         os.makedirs(os.path.dirname(file_path))
     df = pd.DataFrame.from_records(opt)
-    df['pose'] = df['pose'].apply(np.ndarray.tolist)
+    df[col_tolist] = df[col_tolist].apply(np.ndarray.tolist)
     df.to_csv(file_path, index=False)
 
 
