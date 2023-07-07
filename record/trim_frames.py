@@ -5,9 +5,9 @@ from dataset_tools.config import dataset_path
 from dataset_tools.loaders import get_camera_names
 
 if __name__ == '__main__':
-    scene_name = 'scene_2303102008'
-    start_frame = 160
-    end_frame = 750  # inclusive
+    scene_name = 'scene_230704142825'
+    start_frame = 91
+    end_frame = 530  # inclusive
 
     for camera_name in get_camera_names(f'{dataset_path}/{scene_name}'):
         camera_path = f'{dataset_path}/{scene_name}/{camera_name}'

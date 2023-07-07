@@ -125,7 +125,7 @@ def view_infra_pose(scene_name):
 
 
 if __name__ == '__main__':
-    scene_names = ['scene_230531164514']
+    scene_names = ['scene_230704142825']
 
     for scene_name in scene_names:
         extract_infra_pose(scene_name)

@@ -126,10 +126,14 @@ class Annotation(Open3dWindow):
             print(f'{obj_model_names[obj_id]} already exists')
             return
 
-        self.opt = np.append(self.opt, self.opt[-1])
+        if self.opt.size == 1 and self.opt[0]['obj_id'] == -1:
+            pass
+        else:
+            self.opt = np.append(self.opt, self.opt[-1])
         self.opt[-1]['frame'] = self.frame_num
         self.opt[-1]['obj_id'] = obj_id
 
+        print(self.opt)
         print(f'{obj_model_names[obj_id]} added')
         self.update_frame()
 
@@ -324,11 +328,12 @@ class Annotation(Open3dWindow):
 
 
 if __name__ == "__main__":
-    scene_name = 'scene_230531164514'
-    start_image_num = 328
+    scene_name = 'scene_230704142825'
+    start_image_num = 92
     hand_mask_dir = 'hand_pose/d2/mask'
     # init_obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
     init_obj_pose_file = '../object_pose/ground_truth.csv'
+    # init_obj_pose_file = None
 
     gui.Application.instance.initialize()
     w = Annotation(scene_name, start_image_num, init_obj_pose_file=init_obj_pose_file)

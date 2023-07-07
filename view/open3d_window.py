@@ -1,4 +1,3 @@
-import argparse
 import os
 from copy import deepcopy
 
@@ -8,7 +7,7 @@ import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 
-from dataset_tools.config import dataset_path, obj_ply_paths, obj_model_paths
+from dataset_tools.config import dataset_path, obj_ply_paths
 from dataset_tools.loaders import get_camera_names, load_intrinsics, load_extrinsics, get_depth_scale, \
     load_object_pose_table, get_num_frame
 
@@ -40,7 +39,8 @@ class Open3dWindow:
         # load camera info
         self.intrinsics = {}
         self.extrinsics = load_extrinsics(f'{self.scene_path}/extrinsics.yml')
-        self.depth_scale = get_depth_scale(f'{self.scene_path}/{self.camera_names[0]}/camera_meta.yml', convert2unit='m')
+        self.depth_scale = get_depth_scale(f'{self.scene_path}/{self.camera_names[0]}/camera_meta.yml',
+                                           convert2unit='m')
         for camera_name in self.camera_names:
             self.intrinsics[camera_name] = load_intrinsics(f'{self.scene_path}/{camera_name}/camera_meta.yml')
             self.extrinsics[camera_name] = np.linalg.inv(self.extrinsics[camera_name])
@@ -107,16 +107,24 @@ class Open3dWindow:
         # obj poses
         self.obj_pose_file = obj_pose_file
         self.obj_pose_box = gui.Checkbox(f'Objects')
+        self.meshes = self.load_all_obj_meshes()
+        self.view_ctrls.add_child(gui.Label(obj_pose_file))
+        self.obj_pose_box.set_on_checked(self.update_frame)
+        self.view_ctrls.add_child(self.obj_pose_box)
+        self.view_ctrls.add_child(gui.Label(""))
         if obj_pose_file is not None:
             self.opt = load_object_pose_table(f"{self.scene_path}/{self.camera_names[0]}/{obj_pose_file}",
                                               only_valid_pose=True)
-            self.meshes = self.load_all_obj_meshes()
-            self.view_ctrls.add_child(gui.Label(obj_pose_file))
-            self.obj_pose_box.set_on_checked(self.update_frame)
-            self.view_ctrls.add_child(self.obj_pose_box)
-            self.view_ctrls.add_child(gui.Label(""))
+            self.obj_pose_box.checked = True
         else:
-            print('here')
+            print('Using a temporary object pose table.')
+            self.opt = np.array([(scene_name, 'combined', -1, -1, 'ground_truth', np.eye(4))],
+                                dtype=[('scene_name', 'U20'),
+                                       ('camera_name', 'U20'),
+                                       ('frame', 'i4'),
+                                       ('obj_id', 'i4'),
+                                       ('predictor', 'U20'),
+                                       ('pose', 'O')])
             self.obj_pose_box.checked = False
 
         # infrastructure poses
@@ -159,7 +167,9 @@ class Open3dWindow:
         meshes = {}
         for id, p in obj_ply_paths.items():
             geometry = o3d.io.read_triangle_mesh(p)
-            if id != 101:
+            if id == 101 or id == 70:
+                pass
+            else:
                 geometry = geometry.scale(0.001, geometry.get_center() / 1000)
             # geometry.points = o3d.utility.Vector3dVector(np.array(geometry.points) / 1000)
             meshes[id] = geometry

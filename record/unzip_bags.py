@@ -100,6 +100,6 @@ def unzip_bags(scene_name, preview=True):
 if __name__ == '__main__':
     multiprocessing.set_start_method('spawn')
 
-    scene_names = ['scene_230531164514']
+    scene_names = ['scene_230704142825']
     for scene_name in scene_names:
         unzip_bags(scene_name, preview=False)

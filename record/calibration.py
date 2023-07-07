@@ -74,7 +74,7 @@ def generate_cameras_meta(scene_path, frame_rate):
     with open(f'{scene_path}/cameras_meta.yml', 'w') as file:
         yaml.dump(meta, file)
 
-    with open(f'{scene_path}/extrinsics.json', 'w') as file:
+    with open(f'{scene_path}/extrinsics.yml', 'w') as file:
         yaml.dump(extrinsics, file)
 
     print('saved cameras_meta.yml')

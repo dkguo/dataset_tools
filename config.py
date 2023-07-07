@@ -35,7 +35,8 @@ ycb_model_names = [
     "100_sink_unit",
     "101_sink_only",
     "102_faucet_with_cap",
-    "103_sink_only"
+    "103_sink_only",
+    "070_blue_bowl",
 ]
 
 obj_model_names = {}
@@ -50,6 +51,9 @@ for model_name in ycb_model_names:
     obj_ply_paths[obj_id] = f'{models_path}/{model_name}/object.ply'
 
 obj_ply_paths[101] = f'{models_path}/sink_unit/meshes/sink.STL'
+
+obj_ply_paths[70] = f'{models_path}/070_blue_bowl/blue_bowl.obj'
+
 # obj_ply_paths[100] = f'{models_path}/024_bowl/object.ply'
 
 
