@@ -45,7 +45,7 @@ obj_texture_paths = {}
 obj_ply_paths = {}
 for model_name in ycb_model_names:
     obj_id = int(model_name[:3])
-    obj_model_names[obj_id] = model_name
+    obj_model_names[obj_id] = model_name[4:]
     obj_model_paths[obj_id] = f'{models_path}/{model_name}/textured_simple.obj'
     obj_texture_paths[obj_id] = f'{models_path}/{model_name}/texture_map.png'
     obj_ply_paths[obj_id] = f'{models_path}/{model_name}/object.ply'
