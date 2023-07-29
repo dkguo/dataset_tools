@@ -12,6 +12,12 @@ import yaml
 from dataset_tools.config import dataset_path
 
 
+def get_scene_path(scene_name_path):
+    if '/' in scene_name_path:
+        return scene_name_path
+    return f'{dataset_path}/{scene_name_path}'
+
+
 def get_camera_names(scene_path):
     folders = os.listdir(scene_path)
     camera_seq = []
@@ -21,7 +27,8 @@ def get_camera_names(scene_path):
     return sorted(camera_seq)
 
 
-def get_num_frame(scene_path):
+def get_num_frame(scene_name_path):
+    scene_path = get_scene_path(scene_name_path)
     camera_names = get_camera_names(scene_path)
     nums = []
     for camera_name in camera_names:
@@ -114,7 +121,8 @@ def load_cameras_intrisics(scene_name):
         cameras_intrinsics = {}
         camera_names = get_camera_names(f'{dataset_path}/{scene_name}')
         for camera_name in camera_names:
-            cameras_intrinsics[camera_name] = load_intrinsics(f'{dataset_path}/{scene_name}/{camera_name}/camera_meta.yml')
+            cameras_intrinsics[camera_name] = load_intrinsics(
+                f'{dataset_path}/{scene_name}/{camera_name}/camera_meta.yml')
         return cameras_intrinsics
 
 
@@ -133,7 +141,7 @@ def get_depth_scale(camera_meta_path, convert2unit='mm'):
     return depth_scale
 
 
-def load_object_pose_table(file_path, only_valid_pose=False, fill_nan=False):
+def load_object_pose_table(file_path, only_valid_pose=False, fill_nan=False, mm2m=False):
     """
     Returns:
         obj_pose_table (opt), numpy recarray
@@ -148,6 +156,10 @@ def load_object_pose_table(file_path, only_valid_pose=False, fill_nan=False):
         df = df.drop(index=drop_idxs)
     opt = df.to_records(index=False)
 
+    if mm2m:
+        for i in range(len(opt)):
+            opt[i]['pose'][:3, 3] /= 1000.0
+
     if fill_nan:
         obj_ids = set(opt['obj_id'])
         scene_name = opt[0]['scene_name']
@@ -160,6 +172,15 @@ def load_object_pose_table(file_path, only_valid_pose=False, fill_nan=False):
                     opt[-1]['frame'] = frame
                     opt[-1]['pose'] = np.full((4, 4), np.nan)
     return opt
+
+
+def create_empty_opt():
+    return np.empty(0, dtype=[('scene_name', 'U20'),
+                              ('camera_name', 'U20'),
+                              ('frame', 'i4'),
+                              ('obj_id', 'i4'),
+                              ('predictor', 'U20'),
+                              ('pose', 'O')])
 
 
 def save_object_pose_table(opt, file_path, col_tolist='pose'):
