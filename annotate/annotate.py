@@ -160,32 +160,7 @@ class Annotation(Open3dWindow):
         print('infrastructure pose saved')
 
     def on_keyboard_input(self, event):
-        if event.is_repeat:
-            return True
-
-        # Change frame
-        if event.key == gui.KeyName.LEFT:
-            if event.type == gui.KeyEvent.DOWN:
-                self.on_previous_frame()
-            return True
-        if event.key == gui.KeyName.RIGHT:
-            if event.type == gui.KeyEvent.DOWN:
-                self.on_next_frame()
-            return True
-
-        # Change camera view
-        if 49 <= event.key <= 56:
-            if event.type == gui.KeyEvent.DOWN:
-                view_id = event.key - 49
-                if view_id < len(self.camera_names):
-                    self.on_change_active_camera_view(view_id)
-                    return True
-
-        if event.key == gui.KeyName.LEFT_SHIFT:
-            if event.type == gui.KeyEvent.DOWN:
-                self.left_shift_modifier = True
-            elif event.type == gui.KeyEvent.UP:
-                self.left_shift_modifier = False
+        if super().on_keyboard_input(event):
             return True
 
         # if ctrl is pressed then increase translation and angle values

@@ -15,7 +15,7 @@ from dataset_tools.view.open3d_window import Open3dWindow
 
 
 class PointCloudWindow(Open3dWindow):
-    def __init__(self, scene_name, init_frame_num, width=640 * 3 + 408, height=480 * 3, hand_mask_dir=None,
+    def __init__(self, scene_name, init_frame_num, width=640 * 3 + 408, height=480 * 3, mask_dir=None,
                  obj_pose_file=None, infra_pose_file=None):
         super().__init__(width, height, scene_name, 'Point Cloud', init_frame_num, obj_pose_file, infra_pose_file)
         self.bounds = None
@@ -31,21 +31,21 @@ class PointCloudWindow(Open3dWindow):
         self.window.set_on_layout(self.on_layout)
 
         # mask
-        self.hand_mask_dir = hand_mask_dir
-        self.hand_mask_box = gui.Checkbox(f'Apply Masks')
-        if hand_mask_dir is not None:
-            self.hand_masks = {}
-            self.view_ctrls.add_child(gui.Label(hand_mask_dir))
-            self.hand_mask_box.set_on_checked(self.update_frame)
-            self.view_ctrls.add_child(self.hand_mask_box)
+        self.mask_dir = mask_dir
+        self.mask_box = gui.Checkbox(f'Apply Masks')
+        self.masks = {}
+        self.mask_intsct_box = gui.Checkbox(f'Intersect Masks')
+        if mask_dir is not None:
+            self.view_ctrls.add_child(gui.Label(mask_dir))
+            self.mask_box.set_on_checked(self.update_frame)
+            self.view_ctrls.add_child(self.mask_box)
 
             # intersection
-            self.hand_mask_intsct_box = gui.Checkbox(f'Intersect Masks')
-            self.hand_mask_intsct_box.set_on_checked(self.update_frame)
-            self.view_ctrls.add_child(self.hand_mask_intsct_box)
-            self.hand_mask_intsct_convex_hull_box = gui.Checkbox(f'Show convex hull')
-            self.hand_mask_intsct_convex_hull_box.set_on_checked(self.update_frame)
-            self.view_ctrls.add_child(self.hand_mask_intsct_convex_hull_box)
+            self.mask_intsct_box.set_on_checked(self.update_frame)
+            self.view_ctrls.add_child(self.mask_intsct_box)
+            self.mask_intsct_convex_hull_box = gui.Checkbox(f'Show convex hull')
+            self.mask_intsct_convex_hull_box.set_on_checked(self.update_frame)
+            self.view_ctrls.add_child(self.mask_intsct_convex_hull_box)
             self.view_ctrls.add_child(gui.Label(""))
 
         # select camera views
@@ -89,21 +89,21 @@ class PointCloudWindow(Open3dWindow):
             rgb_img = self.rgb_imgs[camera_name]
             depth_img = self.depth_imgs[camera_name]
 
-            if self.hand_mask_box.checked:
-                mask = self.hand_masks[camera_name]
+            if self.mask_box.checked:
+                mask = self.masks[camera_name]
                 rgb_img = cv2.bitwise_and(rgb_img, rgb_img, mask=mask)
                 depth_img = cv2.bitwise_and(depth_img, depth_img, mask=mask)
 
             pcds += load_pcd_from_rgbd(rgb_img, depth_img, intrinsic, extrinsic)
         return pcds
 
-    def load_hand_masks(self):
+    def load_masks(self):
         for camera_name in self.camera_names:
-            mask_path = f'{self.scene_path}/{camera_name}/{self.hand_mask_dir}/{self.frame_num:06}.png'
+            mask_path = f'{self.scene_path}/{camera_name}/{self.mask_dir}/{self.frame_num:06}.png'
             if os.path.exists(mask_path):
-                self.hand_masks[camera_name] = cv2.imread(mask_path, 0)
+                self.masks[camera_name] = cv2.imread(mask_path, 0)
             else:
-                self.hand_masks[camera_name] = np.zeros((resolution_height, resolution_width)).astype('uint8')
+                self.masks[camera_name] = np.zeros((resolution_height, resolution_width)).astype('uint8')
 
     def load_convex_hulls_ls(self):
         hulls = []
@@ -111,7 +111,7 @@ class PointCloudWindow(Open3dWindow):
         for camera_name in self.get_selected_camera_names():
             intrinsic = self.intrinsics[camera_name]
             extrinsic = self.extrinsics[camera_name]
-            mask = self.hand_masks[camera_name]
+            mask = self.masks[camera_name]
             if mask.max() == 0:
                 continue
             hull, hull_ls = compute_convex_hull_line_set_from_mask(mask, intrinsic, extrinsic)
@@ -124,13 +124,13 @@ class PointCloudWindow(Open3dWindow):
         self.scene_widget.scene.clear_geometry()
         self.update_frame_label()
         self.load_images()
-        self.load_hand_masks()
+        self.load_masks()
         pcd = self.load_pcds()
 
-        if self.hand_mask_intsct_box.checked:
+        if self.mask_intsct_box.checked:
             convex_hulls, hull_lss = self.load_convex_hulls_ls()
             pcd = crop_pcd_by_convex_hulls(pcd, convex_hulls)
-            if self.hand_mask_intsct_convex_hull_box.checked:
+            if self.mask_intsct_convex_hull_box.checked:
                 for i, hull_ls in enumerate(hull_lss):
                     self.scene_widget.scene.add_geometry(f"hull_{i}", hull_ls, self.settings.line_set_material)
 
@@ -155,19 +155,6 @@ class PointCloudWindow(Open3dWindow):
                 active_camera_ids.append(i)
         return np.array(self.camera_names)[active_camera_ids]
 
-    def on_keyboard_input(self, event):
-        if event.is_repeat:
-            return gui.Widget.EventCallbackResult.HANDLED
-
-        # Change camera view
-        if 49 <= event.key <= 56:
-            if event.type == gui.KeyEvent.DOWN:
-                view_id = event.key - 49
-                if view_id < len(self.camera_names):
-                    self.on_change_active_camera_view(view_id)
-                    return gui.Widget.EventCallbackResult.HANDLED
-        return gui.Widget.EventCallbackResult.HANDLED
-
     def save_distances(self, save_file_path, dist_tres=0.01, valid_infra_ids=[101]):
         detections = np.empty(0, dtype=[('frame', 'i4'),
                                         ('obj_id_1', 'i4'),
@@ -179,7 +166,7 @@ class PointCloudWindow(Open3dWindow):
         for frame in tqdm(range(get_num_frame(self.scene_path))):
             self.frame_num = frame
             self.load_images()
-            self.load_hand_masks()
+            self.load_masks()
             pcd = self.load_pcds()
             convex_hulls, hull_lss = self.load_convex_hulls_ls()
             hand_pcd = crop_pcd_by_convex_hulls(pcd, convex_hulls)
@@ -277,16 +264,19 @@ def load_pcd_from_rgbd(rgb_img, depth_img, intrisic, extrinsic):
 
 def main():
     scene_name = 'scene_230313171600'
-    start_image_num = 220
-    hand_mask_dir = 'hand_pose/d2/mask'
+    start_image_num = 92
+    # mask_dir = 'hand_pose/d2/mask'
+    mask_dir = 'object_pose/gsa/bowl'
     # obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
-    obj_pose_file = '../object_pose/ground_truth.csv'
+    obj_pose_file = '../object_pose/point_cloud_corrected.csv'
     # infra_pose_file = 'infra_poses.csv'
     infra_pose_file = None
 
     gui.Application.instance.initialize()
     w = PointCloudWindow(scene_name, start_image_num,
-                         hand_mask_dir=hand_mask_dir, obj_pose_file=obj_pose_file, infra_pose_file=infra_pose_file)
+                         mask_dir=mask_dir,
+                         obj_pose_file=obj_pose_file,
+                         infra_pose_file=infra_pose_file)
     # w.save_distances(f'{dataset_path}/{scene_name}/segmentation_points/point_cloud/obj_states.csv')
 
     gui.Application.instance.run()

@@ -9,7 +9,7 @@ import open3d.visualization.rendering as rendering
 
 from dataset_tools.config import dataset_path, obj_ply_paths
 from dataset_tools.loaders import get_camera_names, load_intrinsics, load_extrinsics, get_depth_scale, \
-    load_object_pose_table, get_num_frame
+    load_object_pose_table, get_num_frame, create_empty_opt
 
 
 class Settings:
@@ -118,13 +118,9 @@ class Open3dWindow:
             self.obj_pose_box.checked = True
         else:
             print('Using a temporary object pose table.')
-            self.opt = np.array([(scene_name, 'combined', -1, -1, 'ground_truth', np.eye(4))],
-                                dtype=[('scene_name', 'U20'),
-                                       ('camera_name', 'U20'),
-                                       ('frame', 'i4'),
-                                       ('obj_id', 'i4'),
-                                       ('predictor', 'U20'),
-                                       ('pose', 'O')])
+            self.opt = create_empty_opt()
+            self.opt = np.append(self.opt, np.array([(scene_name, 'combined', -1, -1, 'ground_truth', np.eye(4))],
+                                                    dtype=self.opt.dtype))
             self.obj_pose_box.checked = False
 
         # infrastructure poses
@@ -170,7 +166,7 @@ class Open3dWindow:
             if id == 101 or id == 70:
                 pass
             else:
-                geometry = geometry.scale(0.001, geometry.get_center() / 1000)
+                geometry.scale(0.001, geometry.get_center() / 1000)
             # geometry.points = o3d.utility.Vector3dVector(np.array(geometry.points) / 1000)
             meshes[id] = geometry
         return meshes
@@ -182,9 +178,9 @@ class Open3dWindow:
 
     def load_infra_mesh(self, infra_id):
         t = self.ipt[self.ipt['obj_id'] == infra_id]
-        return self.load_mesh(t, infra_id, mm2m=False)
+        return self.load_mesh(t, infra_id)
 
-    def load_mesh(self, table_rows, obj_id, mm2m=True):
+    def load_mesh(self, table_rows, obj_id, mm2m=False):
         if len(table_rows) == 0:
             return None
         assert len(table_rows) == 1
@@ -194,13 +190,31 @@ class Open3dWindow:
         pose = deepcopy(table_row['pose'])
         if mm2m:
             pose[0:3, 3] /= 1000
-        geometry.translate(pose[0:3, 3])
-        center = pose[0:3, 3]
-        geometry.rotate(pose[0:3, 0:3], center=center)
+        geometry.transform(pose)
         return geometry
 
     def on_keyboard_input(self, event):
-        pass
+        if event.is_repeat:
+            return gui.Widget.EventCallbackResult.HANDLED
+
+        # Change frame
+        if event.key == gui.KeyName.LEFT:
+            if event.type == gui.KeyEvent.DOWN:
+                self.on_previous_frame()
+            return True
+        if event.key == gui.KeyName.RIGHT:
+            if event.type == gui.KeyEvent.DOWN:
+                self.on_next_frame()
+            return True
+
+        # Change camera view
+        if 49 <= event.key <= 56:
+            if event.type == gui.KeyEvent.DOWN:
+                view_id = event.key - 49
+                if view_id < len(self.camera_names):
+                    self.on_change_active_camera_view(view_id)
+                    return gui.Widget.EventCallbackResult.HANDLED
+        return gui.Widget.EventCallbackResult.HANDLED
 
     def on_change_active_camera_view(self, camera_id):
         if camera_id < len(self.camera_names):
