@@ -15,6 +15,17 @@ from dataset_tools.bop_toolkit.bop_toolkit_lib.inout import save_im, save_depth
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
 
 
+def save_intrinsics(camera_path, frameset):
+    intrinsics = frameset.get_profile().as_video_stream_profile().get_intrinsics()
+    fx, fy, px, py = intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy
+    with open(f'{camera_path}/camera_meta.yml', 'w') as file:
+        save_str = {'INTRINSICS': [fx, 0.0, px, 0.0, fy, py, 0.0, 0.0, 1.0],
+                    'DEPTH_UNIT': 'mm',
+                    'FRAME_WIDTH': resolution_width,
+                    'FRAME_HEIGHT': resolution_height}
+        yaml.dump(save_str, file)
+
+
 def unzip_bag(bag_path, preview=True):
     camera_name = os.path.basename(bag_path)[:-4]
     print('processing', bag_path)
@@ -37,22 +48,14 @@ def unzip_bag(bag_path, preview=True):
     playback.set_real_time(False)
     align = rs.align(rs.stream.color)
 
-    # save intrinsics
     frameset = pipeline.wait_for_frames()
     frameset = align.process(frameset)
-    prev_time = frameset.get_timestamp() / 1000
-    intrinsics = frameset.get_profile().as_video_stream_profile().get_intrinsics()
-    fx, fy, px, py = intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy
-    with open(f'{camera_path}/camera_meta.yml', 'w') as file:
-        save_str = {'INTRINSICS': [fx, 0.0, px, 0.0, fy, py, 0.0, 0.0, 1.0],
-                    'DEPTH_UNIT': 'mm',
-                    'FRAME_WIDTH': resolution_width,
-                    'FRAME_HEIGHT': resolution_height}
-        yaml.dump(save_str, file)
+    save_intrinsics(camera_path, frameset)
 
     # save frame to png
     frame_num = 0
     dict_i_time = {}
+    prev_time = frameset.get_timestamp() / 1000
     while True:
         frameset = pipeline.wait_for_frames()
         frameset = align.process(frameset)
