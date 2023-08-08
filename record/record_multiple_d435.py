@@ -100,20 +100,21 @@ class D435s:
             elif key & 0xFF == ord('c'):
                 self.capture()
 
-    def capture(self):
+    def capture(self, view=True):
         frame_num = datetime.now().strftime("%H%M%S")
         color_images, depth_images, colorized_depth_images, framesets = self._get_images(align_depth_to_color=True)
 
-        preview_img = collage_imgs(color_images + colorized_depth_images)
-        cv2.namedWindow('Capture', cv2.WINDOW_AUTOSIZE)
-        cv2.imshow('Capture', preview_img)
+        if view:
+            preview_img = collage_imgs(color_images + colorized_depth_images)
+            cv2.namedWindow('Capture', cv2.WINDOW_AUTOSIZE)
+            cv2.imshow('Capture', preview_img)
 
-        key = cv2.waitKey()
-        cv2.destroyAllWindows()
-        if key & 0xFF == ord('q'):
-            return
-        elif key & 0xFF == ord('r'):
-            return self.capture()
+            key = cv2.waitKey()
+            cv2.destroyAllWindows()
+            if key & 0xFF == ord('q'):
+                return
+            elif key & 0xFF == ord('r'):
+                return self.capture()
 
         for device_name, color_image, depth_image, frameset in zip(self.devices.keys(), color_images,
                                                                    depth_images, framesets):

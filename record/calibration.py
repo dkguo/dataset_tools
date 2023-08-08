@@ -84,7 +84,7 @@ def main():
     frame_rate = 6  # fps
     num_frame_for_each_angle = 50
     vis_calibration = True
-    scene_name = f'scene_{datetime.now().strftime("%y%m%d%H%M")}_ext'
+    scene_name = f'scene_{datetime.now().strftime("%y%m%d%H%M%S")}_ext'
     scene_path = f'{dataset_path}/{scene_name}'
 
     create_folders(scene_path)
@@ -132,6 +132,7 @@ def main():
     calibrate = False
     num_frame = 0
     calibrate_frame = 0
+    print('press E to start recording, press Q to start calibration')
     while True:
         color_images = []
         for device_name, device in devices.items():

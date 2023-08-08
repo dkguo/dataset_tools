@@ -214,7 +214,7 @@ class Open3dWindow:
                 if view_id < len(self.camera_names):
                     self.on_change_active_camera_view(view_id)
                     return gui.Widget.EventCallbackResult.HANDLED
-        return gui.Widget.EventCallbackResult.HANDLED
+        return False
 
     def on_change_active_camera_view(self, camera_id):
         if camera_id < len(self.camera_names):

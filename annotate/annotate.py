@@ -109,7 +109,7 @@ class Annotation(Open3dWindow):
                 for obj_id in obj_ids:
                     mesh = self.load_obj_mesh(obj_id)
                     self.scene_widgets[i].scene.add_geometry(str(obj_id), mesh, self.settings.obj_material)
-                self.meshes_used.set_items([obj_model_names[i] for i in obj_ids])
+                self.meshes_used.set_items([f'{i:03d}_{obj_model_names[i]}' for i in obj_ids])
                 self.meshes_used.selected_index = 0
             else:
                 self.meshes_used.set_items([])
@@ -251,9 +251,7 @@ class Annotation(Open3dWindow):
         pose = self.opt[d]['pose']
 
         geometry = deepcopy(self.meshes[obj_id])
-        geometry.translate(pose[0:3, 3] / 1000)
-        center = pose[0:3, 3] / 1000
-        geometry.rotate(pose[0:3, 0:3], center=center)
+        geometry.transform(pose)
 
         T_ci_to_c0 = self.extrinsics[self.camera_names[self.active_camera_view]]
 
@@ -275,7 +273,6 @@ class Annotation(Open3dWindow):
         h_transform = np.linalg.inv(T_ci_to_c0) @ ci_h_transform @ T_ci_to_c0
 
         geometry.transform(h_transform)
-        h_transform[0:3, 3] *= 1000
         new_pose = h_transform @ pose
         self.opt[d]['pose'] = new_pose
 
@@ -304,7 +301,7 @@ class Annotation(Open3dWindow):
 
 if __name__ == "__main__":
     scene_name = 'scene_230704142825'
-    start_image_num = 92
+    start_image_num = 370
     hand_mask_dir = 'hand_pose/d2/mask'
     # init_obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
     init_obj_pose_file = '../object_pose/ground_truth.csv'
