@@ -37,6 +37,17 @@ def get_num_frame(scene_name_path):
     return min(nums)
 
 
+def get_available_frames(scene_name_path):
+    scene_path = get_scene_path(scene_name_path)
+    camera_names = get_camera_names(scene_path)
+    frames = []
+    for camera_name in camera_names:
+        files = glob.glob(f"{scene_path}/{camera_name}/rgb/*.png")
+        frames.append([int(f[-10:-4]) for f in files])
+    frames = list(set.intersection(*map(set, frames)))
+    return frames
+
+
 def save_mp4(imgs, video_save_path, frame_rate=15):
     assert video_save_path[-3:] == 'mp4', 'video_save_path has to end with mp4'
     dim = (imgs[0].shape[1], imgs[0].shape[0])
@@ -211,9 +222,9 @@ def load_primitives_table(file_path):
     return pt
 
 
-def load_infra_pose(scene_name):
+def load_infra_pose(scene_name, infra_name='sink_unit'):
     ipt = load_object_pose_table(f"{dataset_path}/{scene_name}/infra_poses.csv", only_valid_pose=True)
-    infra_pose = ipt[ipt['obj_id'] == 100]['pose'][0]
+    infra_pose = ipt[ipt['name'] == infra_name]['pose'][0]
     return infra_pose
 
 
@@ -240,5 +251,5 @@ if __name__ == '__main__':
     # cameras_intics = load_cameras_intrisics(scene_name)
     # print(cameras_intics)
 
-    pt = load_primtives_table('/home/gdk/Data/kitchen_countertops/scene_2210232307_01/primitives.csv')
+    pt = load_primitives_table('/home/gdk/Data/kitchen_countertops/scene_2210232307_01/primitives.csv')
     print()

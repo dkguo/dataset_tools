@@ -80,15 +80,16 @@ def generate_cameras_meta(scene_path, frame_rate):
     print('saved cameras_meta.yml')
 
 
-def main():
+if __name__ == '__main__':
     frame_rate = 6  # fps
-    num_frame_for_each_angle = 50
-    vis_calibration = True
+    num_frame_for_each_angle = 10
+    vis_calibration = False
     scene_name = f'scene_{datetime.now().strftime("%y%m%d%H%M%S")}_ext'
+    scene_name = 'scene_230822172959'
     scene_path = f'{dataset_path}/{scene_name}'
 
-    create_folders(scene_path)
-
+    # create_folders(scene_path)
+    #
     # Enable all devices
     rs_config = rs.config()
     rs_config.enable_stream(rs.stream.color, resolution_width, resolution_height, rs.format.bgr8, frame_rate)
@@ -102,7 +103,7 @@ def main():
             serial = device.get_info(rs.camera_info.serial_number)
             device_name = f'camera_{i + 1:02d}_{serial}'
             camera_path = f'{scene_path}/{device_name}'
-            os.mkdir(camera_path)
+            os.makedirs(camera_path, exist_ok=True)
 
             # Enable D400 device
             pipeline = rs.pipeline()
@@ -111,69 +112,69 @@ def main():
 
             devices[device_name] = Device(camera_path, pipeline, pipeline_profile)
     print(f'{len(devices)} devices are enabled')
-
-    # save intrinsics
-    cameras = {}
-    for device_name, device in devices.items():
-        frameset = device.pipeline.wait_for_frames()
-        intrinsics = frameset.get_profile().as_video_stream_profile().get_intrinsics()
-        fx, fy, px, py = intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy
-
-        cameras[device_name] = {
-            "model": "standard",
-            "image_size": [resolution_width, resolution_height],
-            "K": [[fx, 0.0, px], [0.0, fy, py], [0.0, 0.0, 1.0]],
-            "dist": [[0.0, 0.0, 0.0, 0.0, 0.0]]
-        }
-    with open(f'{scene_path}/intrinsics.json', 'w') as f:
-        json.dump({"cameras": cameras}, f)
-
-    # preview or record images for calibration
-    calibrate = False
-    num_frame = 0
-    calibrate_frame = 0
-    print('press E to start recording, press Q to start calibration')
-    while True:
-        color_images = []
-        for device_name, device in devices.items():
-            streams = device.pipeline_profile.get_streams()
-            frameset = device.pipeline.wait_for_frames()
-
-            if frameset.size() == len(streams):
-                for stream in streams:
-                    if stream.stream_type() == rs.stream.color:
-                        color_frame = frameset.first_or_default(stream.stream_type())
-                        color_image = np.asanyarray(color_frame.get_data())
-                        color_images.append(color_image)
-                        if calibrate:
-                            cv2.imwrite(f'{device.camera_path}/{num_frame:06d}.png', color_image)
-
-        preview_img = collage_imgs(color_images)
-
-        if calibrate:
-            num_frame += 1
-            calibrate_frame += 1
-            preview_img = add_border(preview_img)
-            if calibrate_frame == num_frame_for_each_angle:
-                print(f'Saved {num_frame_for_each_angle} images')
-                print('press E to record from another angle')
-                print('press Q to quit recording and start calibration')
-                calibrate = False
-                calibrate_frame = 0
-
-        cv2.namedWindow('Preview', cv2.WINDOW_AUTOSIZE)
-        cv2.imshow('Preview', preview_img)
-
-        key = cv2.waitKey(1)
-        if key & 0xFF == ord('q') or key == 27:
-            cv2.destroyAllWindows()
-            break
-        if key & 0xFF == ord('e'):
-            print(f'Start recording {num_frame_for_each_angle} images for calibration...')
-            calibrate = True
-
-    calibration(scene_path, vis_calibration)
-    generate_cameras_meta(scene_path, frame_rate)
+    #
+    # # save intrinsics
+    # cameras = {}
+    # for device_name, device in devices.items():
+    #     frameset = device.pipeline.wait_for_frames()
+    #     intrinsics = frameset.get_profile().as_video_stream_profile().get_intrinsics()
+    #     fx, fy, px, py = intrinsics.fx, intrinsics.fy, intrinsics.ppx, intrinsics.ppy
+    #
+    #     cameras[device_name] = {
+    #         "model": "standard",
+    #         "image_size": [resolution_width, resolution_height],
+    #         "K": [[fx, 0.0, px], [0.0, fy, py], [0.0, 0.0, 1.0]],
+    #         "dist": [[0.0, 0.0, 0.0, 0.0, 0.0]]
+    #     }
+    # with open(f'{scene_path}/intrinsics.json', 'w') as f:
+    #     json.dump({"cameras": cameras}, f)
+    #
+    # # preview or record images for calibration
+    # calibrate = False
+    # num_frame = 0
+    # calibrate_frame = 0
+    # print('press E to start recording, press Q to start calibration')
+    # while True:
+    #     color_images = []
+    #     for device_name, device in devices.items():
+    #         streams = device.pipeline_profile.get_streams()
+    #         frameset = device.pipeline.wait_for_frames()
+    #
+    #         if frameset.size() == len(streams):
+    #             for stream in streams:
+    #                 if stream.stream_type() == rs.stream.color:
+    #                     color_frame = frameset.first_or_default(stream.stream_type())
+    #                     color_image = np.asanyarray(color_frame.get_data())
+    #                     color_images.append(color_image)
+    #                     if calibrate:
+    #                         cv2.imwrite(f'{device.camera_path}/{num_frame:06d}.png', color_image)
+    #
+    #     preview_img = collage_imgs(color_images)
+    #
+    #     if calibrate:
+    #         num_frame += 1
+    #         calibrate_frame += 1
+    #         preview_img = add_border(preview_img)
+    #         if calibrate_frame == num_frame_for_each_angle:
+    #             print(f'Saved {num_frame_for_each_angle} images')
+    #             print('press E to record from another angle')
+    #             print('press Q to quit recording and start calibration')
+    #             calibrate = False
+    #             calibrate_frame = 0
+    #
+    #     cv2.namedWindow('Preview', cv2.WINDOW_AUTOSIZE)
+    #     cv2.imshow('Preview', preview_img)
+    #
+    #     key = cv2.waitKey(1)
+    #     if key & 0xFF == ord('q') or key == 27:
+    #         cv2.destroyAllWindows()
+    #         break
+    #     if key & 0xFF == ord('e'):
+    #         print(f'Start recording {num_frame_for_each_angle} images for calibration...')
+    #         calibrate = True
+    #
+    # calibration(scene_path, vis_calibration)
+    # generate_cameras_meta(scene_path, frame_rate)
 
     # verify calibration using april tag cube
     cameras_intr = load_cameras_intrisics(scene_name)
@@ -191,14 +192,10 @@ def main():
                         color_image = np.asanyarray(color_frame.get_data())
                         cameras_img[device_name] = color_image
 
-        cameras_img = verify_calibration(cameras_img, cameras_intr, cameras_ext)
+        cameras_img = verify_calibration(cameras_img, cameras_intr, cameras_ext, tag_size=0.03)
         preview = collage_imgs(list(cameras_img.values()))
         cv2.imshow('verify', preview)
         key = cv2.waitKey(1)
         if key & 0xFF == ord('q') or key == 27:
             cv2.destroyAllWindows()
             break
-
-
-if __name__ == '__main__':
-    main()

@@ -104,6 +104,14 @@ class D435s:
         frame_num = datetime.now().strftime("%H%M%S")
         color_images, depth_images, colorized_depth_images, framesets = self._get_images(align_depth_to_color=True)
 
+        for device_name, frameset in zip(self.devices.keys(), framesets):
+            camera_path = f'{self.scene_path}/{device_name}'
+            if not os.path.exists(camera_path):
+                os.mkdir(camera_path)
+                os.mkdir(f'{camera_path}/rgb')
+                os.mkdir(f'{camera_path}/depth')
+                save_intrinsics(camera_path, frameset)
+
         if view:
             preview_img = collage_imgs(color_images + colorized_depth_images)
             cv2.namedWindow('Capture', cv2.WINDOW_AUTOSIZE)
@@ -116,14 +124,8 @@ class D435s:
             elif key & 0xFF == ord('r'):
                 return self.capture()
 
-        for device_name, color_image, depth_image, frameset in zip(self.devices.keys(), color_images,
-                                                                   depth_images, framesets):
+        for device_name, color_image, depth_image in zip(self.devices.keys(), color_images, depth_images):
             camera_path = f'{self.scene_path}/{device_name}'
-            if not os.path.exists(camera_path):
-                os.mkdir(camera_path)
-                os.mkdir(f'{camera_path}/rgb')
-                os.mkdir(f'{camera_path}/depth')
-                save_intrinsics(camera_path, frameset)
             save_im(f'{camera_path}/rgb/{frame_num}.png', color_image[:, :, ::-1])
             save_depth(f'{camera_path}/depth/{frame_num}.png', depth_image)
         print(f'Frame {frame_num} is saved')
