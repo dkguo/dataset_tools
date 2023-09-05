@@ -8,8 +8,8 @@ import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 
 from dataset_tools.config import dataset_path, obj_ply_paths
-from dataset_tools.loaders import get_camera_names, load_intrinsics, load_extrinsics, get_depth_scale, \
-    load_object_pose_table, get_num_frame, create_empty_opt
+from dataset_tools.utils import get_camera_names, load_intrinsics, load_extrinsics, get_depth_scale, \
+    load_object_pose_table, get_num_frame, create_empty_opt, load_cameras_intrisics
 
 
 class Settings:
@@ -44,6 +44,7 @@ class Open3dWindow:
         for camera_name in self.camera_names:
             self.intrinsics[camera_name] = load_intrinsics(f'{self.scene_path}/{camera_name}/camera_meta.yml')
             self.extrinsics[camera_name] = np.linalg.inv(self.extrinsics[camera_name])
+        # self.intrinsics = load_cameras_intrisics(scene_name)
 
         self.rgb_imgs = {}
         self.depth_imgs = {}

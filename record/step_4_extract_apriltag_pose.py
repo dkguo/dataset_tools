@@ -7,7 +7,7 @@ import numpy as np
 from tqdm import tqdm
 
 from dataset_tools.config import dataset_path
-from dataset_tools.loaders import load_cameras_intrisics, load_cameras_extrinsics, load_imgs_across_cameras, \
+from dataset_tools.utils import load_cameras_intrisics, load_cameras_extrinsics, load_imgs_across_cameras, \
     get_camera_names, intr2param, load_object_pose_table, load_infra_pose, save_object_pose_table, get_available_frames
 from dataset_tools.record.apriltag_detection import detect_april_tag, draw_pose, draw_pose_axes
 from dataset_tools.view.helpers import collage_imgs
@@ -74,18 +74,17 @@ def get_tag_poses(scene_name, frames, target_tag_id, tag_size, mode='best'):
 def extract_infra_pose(scene_name, infra_tag_id=1, infra_tag_size=0.06, num_frames=10):
     tag_pose = get_tag_poses(scene_name, get_available_frames(scene_name)[:num_frames], infra_tag_id, infra_tag_size)
 
-    ipt_path = f'{dataset_path}/{scene_name}/infra_poses.csv'
-    record_infra_pose(ipt_path, 'sink_unit', tag_pose)
+    record_infra_pose(scene_name, 'sink_unit', tag_pose)
 
     t = np.array([[0, 0, 1, 0.47793],
                   [1, 0, 0, -0.06707],
                   [0, 1, 0, -0.29],
                   [0, 0, 0, 1]])
     sink_only_pose = tag_pose @ t
-    record_infra_pose(ipt_path, 'sink_only', sink_only_pose)
+    record_infra_pose(scene_name, 'sink_only', sink_only_pose)
 
 
-def record_infra_pose(ipt_path, obj_name, pose):
+def record_infra_pose(scene_name, obj_name, pose):
     # TODO: hardcoded
     if obj_name == 'sink_unit':
         obj_id = 100
@@ -95,9 +94,12 @@ def record_infra_pose(ipt_path, obj_name, pose):
         obj_id = 110
     elif obj_name == 'robot_base':
         obj_id = 111
+    elif obj_name == 'blue_tip':
+        obj_id = 120
     else:
         raise ValueError(f'unknown object name {obj_name}')
 
+    ipt_path = f'{dataset_path}/{scene_name}/infra_poses.csv'
     if os.path.exists(ipt_path):
         print(f'Updating {obj_name} pose in existing infra_poses.csv...')
         ipt = load_object_pose_table(ipt_path)

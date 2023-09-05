@@ -10,7 +10,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
-from dataset_tools.loaders import get_num_frame, load_object_pose_table, save_object_pose_table
+from dataset_tools.utils import get_num_frame, load_object_pose_table, save_object_pose_table
 from dataset_tools.view.open3d_window import Open3dWindow
 
 
@@ -154,59 +154,6 @@ class PointCloudWindow(Open3dWindow):
             if box.checked:
                 active_camera_ids.append(i)
         return np.array(self.camera_names)[active_camera_ids]
-
-    def save_distances(self, save_file_path, dist_tres=0.01, valid_infra_ids=[101]):
-        detections = np.empty(0, dtype=[('frame', 'i4'),
-                                        ('obj_id_1', 'i4'),
-                                        ('obj_id_2', 'i4'),
-                                        ('relationship', 'U20'),
-                                        ('in_contact', 'i1'),
-                                        ('distance', 'f')])
-
-        for frame in tqdm(range(get_num_frame(self.scene_path))):
-            self.frame_num = frame
-            self.load_images()
-            self.load_masks()
-            pcd = self.load_pcds()
-            convex_hulls, hull_lss = self.load_convex_hulls_ls()
-            hand_pcd = crop_pcd_by_convex_hulls(pcd, convex_hulls)
-
-            for obj_id in self.opt[self.opt['frame'] == frame]['obj_id']:
-                obj_mesh = self.load_obj_mesh(obj_id)
-                obj_pcd = obj_mesh.sample_points_uniformly(1000)
-                # obj-hand
-                if len(convex_hulls) > 0:
-                    dist = compute_pcds_dist(hand_pcd, obj_pcd)
-                    detections = np.append(detections,
-                                           np.array([(frame, obj_id, 0, 'obj-hand', 0, dist)], dtype=detections.dtype))
-
-                # obj-infra
-                for infra_id in valid_infra_ids:
-                    if infra_id in self.ipt['obj_id']:
-                        infra_mesh = self.load_infra_mesh(infra_id)
-                        infra_pcd = infra_mesh.sample_points_uniformly(1000)
-                        dist = compute_pcds_dist(infra_pcd, obj_pcd)
-                        detections = np.append(detections,
-                                               np.array([(frame, obj_id, infra_id, 'obj-infra', 0, dist)],
-                                                        dtype=detections.dtype))
-
-            # obj-infra
-            for infra_id in valid_infra_ids:
-                if infra_id in self.ipt['obj_id'] and len(convex_hulls) > 0:
-                    infra_mesh = self.load_infra_mesh(infra_id)
-                    infra_pcd = infra_mesh.sample_points_uniformly(1000)
-                    dist = compute_pcds_dist(infra_pcd, hand_pcd)
-                    detections = np.append(detections,
-                                           np.array([(frame, infra_id, 0, 'infra-hand', 0, dist)],
-                                                    dtype=detections.dtype))
-
-        detections['in_contact'][detections['distance'] < dist_tres] = 1
-
-        os.makedirs(os.path.dirname(save_file_path), exist_ok=True)
-        df = pd.DataFrame.from_records(detections)
-        df = df.sort_values(by=['obj_id_1', 'obj_id_2', 'frame'])
-        df.to_csv(save_file_path, index=False)
-        print(f'distances saved to {save_file_path}')
 
 
 def compute_pcds_dist(pcd1, pcd2):

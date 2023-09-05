@@ -13,6 +13,7 @@ import yaml
 
 from dataset_tools.bop_toolkit.bop_toolkit_lib.inout import save_im, save_depth
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
+from dataset_tools.utils import get_newest_scene_names
 
 
 def save_intrinsics(camera_path, frameset):
@@ -93,8 +94,8 @@ def unzip_bag(bag_path, preview=True):
 
 def unzip_bags(scene_name, preview=True):
     bag_paths = glob.glob(f'{dataset_path}/{scene_name}/*.bag')
-    print(len(bag_paths), 'have been found:')
-    print(bag_paths)
+    print(len(bag_paths), 'have been found')
+    # print(bag_paths)
 
     with Pool() as pool:
         pool.map(partial(unzip_bag, preview=preview), bag_paths)
@@ -103,6 +104,7 @@ def unzip_bags(scene_name, preview=True):
 if __name__ == '__main__':
     multiprocessing.set_start_method('spawn')
 
-    scene_names = ['scene_230704142825']
+    # scene_names = ['scene_230825131826']
+    scene_names = get_newest_scene_names()
     for scene_name in scene_names:
         unzip_bags(scene_name, preview=False)

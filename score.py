@@ -8,7 +8,7 @@ from tqdm import tqdm
 from config import obj_ply_paths, models_info_path, obj_model_paths, dataset_path, resolution_width, resolution_height
 from dataset_tools.bop_toolkit.bop_toolkit_lib import pose_error, misc, inout, renderer
 from dataset_tools.bop_toolkit.bop_toolkit_lib.inout import load_depth
-from loaders import get_camera_names, load_intrinsics, save_object_pose_table, load_object_pose_table
+from utils import get_camera_names, load_intrinsics, save_object_pose_table, load_object_pose_table
 from dataset_tools.view.renderer import create_renderer, render_obj_pose#, compare_gt_est
 
 

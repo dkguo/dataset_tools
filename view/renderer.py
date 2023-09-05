@@ -13,7 +13,7 @@ from tqdm import tqdm
 #
 # from dataset_tools.bop_toolkit.bop_toolkit_lib import renderer
 # from dataset_tools.config import dataset_path
-from dataset_tools.loaders import get_camera_names, load_object_pose_table, load_all_opts
+from dataset_tools.utils import get_camera_names, load_object_pose_table, load_all_opts
 from dataset_tools.view.helpers import combine_videos
 
 
@@ -260,7 +260,7 @@ import torch
 from transforms3d.quaternions import mat2quat
 
 from dataset_tools.config import dataset_path, resolution_width, resolution_height, obj_model_paths, obj_texture_paths
-from dataset_tools.loaders import load_intrinsics
+from dataset_tools.utils import load_intrinsics
 from dataset_tools.view.ycb_renderer.ycb_renderer import YCBRenderer
 
 

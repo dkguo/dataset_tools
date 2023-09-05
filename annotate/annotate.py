@@ -7,7 +7,7 @@ import open3d as o3d
 from open3d.visualization import gui, rendering
 
 from dataset_tools.config import ycb_model_names, obj_model_names
-from dataset_tools.loaders import save_object_pose_table
+from dataset_tools.utils import save_object_pose_table
 from dataset_tools.view.open3d_window import Open3dWindow
 from dataset_tools.view.point_cloud import load_pcd_from_rgbd
 

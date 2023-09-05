@@ -3,6 +3,7 @@ import json
 import os
 import glob
 import re
+import shutil
 
 import cv2
 import numpy as np
@@ -48,6 +49,16 @@ def get_available_frames(scene_name_path):
     return frames
 
 
+def get_newest_scene_names(num=1):
+    folders = os.listdir(dataset_path)
+    scene_names = []
+    for folder in folders:
+        if folder[:6] == 'scene_' and os.path.isdir(f'{dataset_path}/{folder}'):
+            scene_names.append(folder)
+    scene_names.sort(reverse=True)
+    return scene_names[:num]
+
+
 def save_mp4(imgs, video_save_path, frame_rate=15):
     assert video_save_path[-3:] == 'mp4', 'video_save_path has to end with mp4'
     dim = (imgs[0].shape[1], imgs[0].shape[0])
@@ -90,6 +101,12 @@ def load_imgs_across_cameras(scene_path, camera_names, image_name, mode=cv2.IMRE
         im = cv2.imread(f'{scene_path}/{camera_name}/rgb/{image_name}', mode)
         imgs.append(im)
     return imgs
+
+
+def copy_extrinsics(scene_name):
+    ext_path = sorted(glob.glob(f'{dataset_path}/scene_*_ext'), reverse=True)[0] + '/extrinsics.yml'
+    shutil.copy(ext_path, f'{dataset_path}/{scene_name}/extrinsics.yml')
+    print(f'Copied extrinsics from {ext_path} to {dataset_path}/{scene_name}/extrinsics.yml')
 
 
 def load_intrinsics(camera_meta_path):

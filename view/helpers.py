@@ -8,7 +8,7 @@ from moviepy.editor import *
 from tqdm import tqdm
 
 from dataset_tools.config import dataset_path
-from dataset_tools.loaders import get_camera_names
+from dataset_tools.utils import get_camera_names
 
 
 def collage_imgs(ims, num_rows=2):

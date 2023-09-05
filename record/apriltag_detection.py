@@ -3,7 +3,7 @@ import numpy as np
 import apriltag
 import collections
 
-from dataset_tools.loaders import intr2param
+from dataset_tools.utils import intr2param
 
 apriltag_detect_error_thres = 0.07
 
