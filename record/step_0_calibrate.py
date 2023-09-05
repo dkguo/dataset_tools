@@ -10,10 +10,10 @@ import yaml
 from simple_parsing import ArgumentParser
 
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
-from dataset_tools.utils import load_cameras_intrisics, load_cameras_extrinsics
-from dataset_tools.view.helpers import collage_imgs, add_border
-from dataset_tools.record.multical.multical.app.calibrate import Calibrate
-from dataset_tools.record.apriltag_detection import verify_calibration
+from dataset_tools.utils.camera_parameter import load_cameras_intrisics, load_cameras_extrinsics
+from dataset_tools.utils.multical.multical.app.calibrate import Calibrate
+from dataset_tools.utils.video import collage_imgs, add_border
+from dataset_tools.utils.apriltag import verify_calibration
 
 
 class Device:

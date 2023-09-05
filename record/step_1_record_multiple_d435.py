@@ -1,6 +1,4 @@
-import multiprocessing
 import os
-import shutil
 import time
 from datetime import datetime
 
@@ -8,10 +6,10 @@ import cv2
 import numpy as np
 import pyrealsense2 as rs
 
-from dataset_tools.bop_toolkit.bop_toolkit_lib.inout import save_im, save_depth
+from dataset_tools.utils.bop_toolkit.bop_toolkit_lib.inout import save_im, save_depth
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
 from dataset_tools.record.step_2_unzip_bags import save_intrinsics
-from dataset_tools.view.helpers import collage_imgs
+from dataset_tools.utils.video import collage_imgs
 
 
 class Device:

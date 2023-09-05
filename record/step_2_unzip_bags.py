@@ -11,9 +11,10 @@ import numpy as np
 import cv2
 import yaml
 
-from dataset_tools.bop_toolkit.bop_toolkit_lib.inout import save_im, save_depth
+from dataset_tools.utils.bop_toolkit.bop_toolkit_lib.inout import save_im, save_depth
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
-from dataset_tools.utils import get_newest_scene_names
+from dataset_tools.utils.camera_parameter import copy_extrinsics
+from dataset_tools.utils.name import get_newest_scene_names
 
 
 def save_intrinsics(camera_path, frameset):
@@ -107,4 +108,5 @@ if __name__ == '__main__':
     # scene_names = ['scene_230825131826']
     scene_names = get_newest_scene_names()
     for scene_name in scene_names:
-        unzip_bags(scene_name, preview=False)
+        copy_extrinsics(scene_name)
+        # unzip_bags(scene_name, preview=False)
