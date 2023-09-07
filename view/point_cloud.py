@@ -10,7 +10,6 @@ import pandas as pd
 from tqdm import tqdm
 
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
-from dataset_tools.utils import get_num_frame, load_object_pose_table, save_object_pose_table
 from dataset_tools.view.open3d_window import Open3dWindow
 
 
@@ -81,7 +80,15 @@ class PointCloudWindow(Open3dWindow):
         extrinsic = self.extrinsics[camera_name]
         self.scene_widget.setup_camera(intrinsic, extrinsic, 640, 480, self.bounds)
 
-    def load_pcds(self):
+    def load_pcds(self, frame_num=None, mask_dir=None):
+        if frame_num is not None:
+            self.frame_num = frame_num
+        if mask_dir is not None:
+            self.mask_dir = mask_dir
+            self.mask_box.checked = True
+        if frame_num is not None or mask_dir is not None:
+            self.update_frame()
+
         pcds = o3d.geometry.PointCloud()
         for camera_name in self.get_selected_camera_names():
             intrinsic = self.intrinsics[camera_name]
@@ -139,14 +146,14 @@ class PointCloudWindow(Open3dWindow):
 
         # add objs
         if self.obj_pose_box.checked:
-            for obj_id in self.opt[self.opt['frame'] == self.frame_num]['obj_id']:
-                mesh = self.load_obj_mesh(obj_id)
-                self.scene_widget.scene.add_geometry(str(obj_id), mesh, self.settings.obj_material)
+            for object_name in self.opt[self.opt['frame'] == self.frame_num]['object_name']:
+                mesh = self.load_obj_mesh(object_name)
+                self.scene_widget.scene.add_geometry(str(object_name), mesh, self.settings.obj_material)
 
         if self.infra_pose_box.checked:
-            for obj_id in self.ipt['obj_id']:
-                mesh = self.load_infra_mesh(obj_id)
-                self.scene_widget.scene.add_geometry(str(obj_id), mesh, self.settings.obj_material)
+            for object_name in self.ipt['object_name']:
+                mesh = self.load_infra_mesh(object_name)
+                self.scene_widget.scene.add_geometry(str(object_name), mesh, self.settings.obj_material)
 
     def get_selected_camera_names(self):
         active_camera_ids = []
@@ -154,10 +161,6 @@ class PointCloudWindow(Open3dWindow):
             if box.checked:
                 active_camera_ids.append(i)
         return np.array(self.camera_names)[active_camera_ids]
-
-
-def compute_pcds_dist(pcd1, pcd2):
-    return min(pcd1.compute_point_cloud_distance(pcd2))
 
 
 def crop_pcd_by_convex_hulls(pcd, convex_hulls):
@@ -210,13 +213,15 @@ def load_pcd_from_rgbd(rgb_img, depth_img, intrisic, extrinsic):
 
 
 def main():
-    scene_name = 'scene_230704142825'
-    start_image_num = 370
+    scene_name = 'scene_230905145629'
+    start_image_num = 0
     # mask_dir = 'hand_pose/d2/mask'
-    mask_dir = 'masks/bowl'
+    # mask_dir = 'masks/bowl'
+    mask_dir = None
     # obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
     # obj_pose_file = '../object_pose/point_cloud.csv'
-    obj_pose_file = '../object_pose/ground_truth.csv'
+    # obj_pose_file = '../object_pose/ground_truth.csv'
+    obj_pose_file = None
     # infra_pose_file = 'infra_poses.csv'
     infra_pose_file = None
 

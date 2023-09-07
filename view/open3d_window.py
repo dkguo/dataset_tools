@@ -7,9 +7,10 @@ import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 
-from dataset_tools.config import dataset_path, obj_ply_paths
-from dataset_tools.utils import get_camera_names, load_intrinsics, load_extrinsics, get_depth_scale, \
-    load_object_pose_table, get_num_frame, create_empty_opt, load_cameras_intrisics
+from dataset_tools.config import dataset_path
+from dataset_tools.utils.camera_parameter import load_extrinsics, get_depth_scale, load_intrinsics
+from dataset_tools.utils.name import get_camera_names, get_num_frame
+from dataset_tools.utils.pose import load_object_pose_table, create_empty_opt
 
 
 class Settings:
@@ -120,8 +121,6 @@ class Open3dWindow:
         else:
             print('Using a temporary object pose table.')
             self.opt = create_empty_opt()
-            self.opt = np.append(self.opt, np.array([(scene_name, 'combined', -1, -1, 'ground_truth', np.eye(4))],
-                                                    dtype=self.opt.dtype))
             self.obj_pose_box.checked = False
 
         # infrastructure poses
@@ -162,14 +161,14 @@ class Open3dWindow:
 
     def load_all_obj_meshes(self):
         meshes = {}
-        for id, p in obj_ply_paths.items():
-            geometry = o3d.io.read_triangle_mesh(p)
-            if id == 101 or id == 70:
-                pass
-            else:
-                geometry.scale(0.001, geometry.get_center() / 1000)
-            # geometry.points = o3d.utility.Vector3dVector(np.array(geometry.points) / 1000)
-            meshes[id] = geometry
+        # for id, p in obj_ply_paths.items():
+        #     geometry = o3d.io.read_triangle_mesh(p)
+        #     if id == 101 or id == 70:
+        #         pass
+        #     else:
+        #         geometry.scale(0.001, geometry.get_center() / 1000)
+        #     # geometry.points = o3d.utility.Vector3dVector(np.array(geometry.points) / 1000)
+        #     meshes[id] = geometry
         return meshes
 
     def load_obj_mesh(self, obj_id):
@@ -228,7 +227,7 @@ class Open3dWindow:
 
 
 if __name__ == "__main__":
-    scene_name = 'scene_2210232307_01'
+    scene_name = 'scene_230905145629'
     gui.Application.instance.initialize()
     w = Open3dWindow(2048, 1536, scene_name, 'test')
     gui.Application.instance.run()

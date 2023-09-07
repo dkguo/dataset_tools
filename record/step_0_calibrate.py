@@ -12,8 +12,9 @@ from simple_parsing import ArgumentParser
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
 from dataset_tools.utils.camera_parameter import load_cameras_intrisics, load_cameras_extrinsics
 from dataset_tools.utils.multical.multical.app.calibrate import Calibrate
-from dataset_tools.utils.video import collage_imgs, add_border
+from dataset_tools.utils.image import collage_imgs, add_border
 from dataset_tools.utils.apriltag import verify_calibration
+from dataset_tools.utils.name import get_newest_scene_name
 
 
 class Device:
@@ -37,7 +38,8 @@ def calibration(scene_path, vis_calibration=True):
     parser.add_arguments(Calibrate, dest="app")
     program = parser.parse_args()
 
-    program.app.paths.boards = f'{os.path.dirname(os.path.abspath(__file__))}/multical/example_boards/boards.yaml'
+    program.app.paths.boards = (f'{os.path.dirname(os.path.dirname(os.path.abspath(__file__)))}/'
+                                f'utils/multical/example_boards/boards.yaml')
     program.app.paths.image_path = scene_path
     program.app.paths.limit_images = 2000
     program.app.vis = vis_calibration

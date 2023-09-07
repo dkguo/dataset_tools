@@ -1,10 +1,12 @@
 import glob
+import os
 import shutil
 
 import numpy as np
 import yaml
 
 from dataset_tools.config import dataset_path
+from dataset_tools.utils.name import get_camera_names
 
 
 def copy_extrinsics(scene_name):

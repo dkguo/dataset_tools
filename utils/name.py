@@ -52,3 +52,9 @@ def get_newest_scene_names(num=1):
 
 def get_newest_scene_name():
     return get_newest_scene_names(1)[0]
+
+
+def get_scene_name_from_path(path):
+    for name in path.split('/'):
+        if name[:6] == 'scene_':
+            return name

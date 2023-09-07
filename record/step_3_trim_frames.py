@@ -2,13 +2,13 @@ import glob
 import os
 
 from dataset_tools.config import dataset_path
-from dataset_tools.utils.name import get_camera_names, get_newest_scene_names
+from dataset_tools.utils.name import get_camera_names, get_newest_scene_name
 
 if __name__ == '__main__':
     # scene_name = 'scene_230825131826'
-    scene_name = get_newest_scene_names()[0]
-    start_frame = 58
-    end_frame = 246  # inclusive
+    scene_name = get_newest_scene_name()
+    start_frame = 78
+    end_frame = 256  # inclusive
 
     for camera_name in get_camera_names(f'{dataset_path}/{scene_name}'):
         camera_path = f'{dataset_path}/{scene_name}/{camera_name}'

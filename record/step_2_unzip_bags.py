@@ -109,4 +109,4 @@ if __name__ == '__main__':
     scene_names = get_newest_scene_names()
     for scene_name in scene_names:
         copy_extrinsics(scene_name)
-        # unzip_bags(scene_name, preview=False)
+        unzip_bags(scene_name, preview=False)
