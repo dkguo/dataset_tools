@@ -10,7 +10,7 @@ import open3d.visualization.rendering as rendering
 from dataset_tools.config import dataset_path
 from dataset_tools.utils.camera_parameter import load_extrinsics, get_depth_scale, load_intrinsics
 from dataset_tools.utils.name import get_camera_names, get_num_frame
-from dataset_tools.utils.pose import load_object_pose_table, create_empty_opt
+from dataset_tools.utils.pose import ObjectPoseTable
 
 
 class Settings:
@@ -115,24 +115,13 @@ class Open3dWindow:
         self.view_ctrls.add_child(self.obj_pose_box)
         self.view_ctrls.add_child(gui.Label(""))
         if obj_pose_file is not None:
-            self.opt = load_object_pose_table(f"{self.scene_path}/{self.camera_names[0]}/{obj_pose_file}",
+            self.opt = ObjectPoseTable(f"{self.scene_path}/{self.camera_names[0]}/{obj_pose_file}",
                                               only_valid_pose=True)
             self.obj_pose_box.checked = True
         else:
             print('Using a temporary object pose table.')
-            self.opt = create_empty_opt()
+            self.opt = ObjectPoseTable(scene_name=self.scene_name)
             self.obj_pose_box.checked = False
-
-        # infrastructure poses
-        self.infra_pose_file = infra_pose_file
-        self.infra_pose_box = gui.Checkbox(f'Infrastructure')
-        if infra_pose_file is not None:
-            self.ipt = load_object_pose_table(f"{self.scene_path}/{infra_pose_file}",
-                                              only_valid_pose=True)
-            self.view_ctrls.add_child(gui.Label(infra_pose_file))
-            self.infra_pose_box.set_on_checked(self.update_frame)
-            self.view_ctrls.add_child(self.infra_pose_box)
-            self.view_ctrls.add_child(gui.Label(""))
 
     def load_images(self):
         for camera_name in np.array(self.camera_names):

@@ -10,7 +10,8 @@ def get_scene_path(scene_name_path):
     return f'{dataset_path}/{scene_name_path}'
 
 
-def get_camera_names(scene_path):
+def get_camera_names(scene_name_path):
+    scene_path = get_scene_path(scene_name_path)
     folders = os.listdir(scene_path)
     camera_seq = []
     for folder in folders:
@@ -58,3 +59,12 @@ def get_scene_name_from_path(path):
     for name in path.split('/'):
         if name[:6] == 'scene_':
             return name
+
+
+def get_available_object_names(scene_name):
+    file_names = os.listdir(f'{dataset_path}/{scene_name}/{get_camera_names(scene_name)[0]}/masks')
+    object_names = []
+    for file_name in file_names:
+        if file_name != 'plot' and 'csv' not in file_name:
+            object_names.append(file_name)
+    return object_names

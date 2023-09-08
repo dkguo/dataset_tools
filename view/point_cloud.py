@@ -150,10 +150,10 @@ class PointCloudWindow(Open3dWindow):
                 mesh = self.load_obj_mesh(object_name)
                 self.scene_widget.scene.add_geometry(str(object_name), mesh, self.settings.obj_material)
 
-        if self.infra_pose_box.checked:
-            for object_name in self.ipt['object_name']:
-                mesh = self.load_infra_mesh(object_name)
-                self.scene_widget.scene.add_geometry(str(object_name), mesh, self.settings.obj_material)
+        # if self.infra_pose_box.checked:
+        #     for object_name in self.ipt['object_name']:
+        #         mesh = self.load_infra_mesh(object_name)
+        #         self.scene_widget.scene.add_geometry(str(object_name), mesh, self.settings.obj_material)
 
     def get_selected_camera_names(self):
         active_camera_ids = []

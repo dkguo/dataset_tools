@@ -252,6 +252,14 @@ def view_april_tag_pose(tag_pose, imgs, cameras_intr, camera_ext, tag_size, rend
         cv2.destroyAllWindows()
 
 
+def view_tag_pose_in_scene(scene_name, pose, frame=0, tag_size=0.06):
+    scene_path = f'{dataset_path}/{scene_name}'
+    imgs = load_imgs_across_cameras(scene_path, get_camera_names(scene_path), f'{frame:06d}.png')
+    cameras_intr = load_cameras_intrisics(scene_name)
+    cameras_ext = load_cameras_extrinsics(scene_name)
+    view_april_tag_pose(pose, imgs, cameras_intr, cameras_ext, tag_size=tag_size)
+
+
 if __name__ == '__main__':
     imagepath = '/home/gdk/Documents/data/1652826411/827312071624/000000_color.png'
     camera_params = (765.00, 764.18, 393.72, 304.66)
