@@ -15,6 +15,9 @@ class Table:
         self.scene_name = scene_name
         if table_path is None:
             self.table_path = self.get_default_table_path()
+        elif '/' not in self.table_path:
+            self.scene_name = scene_name or table_path
+            self.table_path = self.get_default_table_path()
         if os.path.exists(self.table_path):
             self.table = self.load(self.table_path, **kwargs)
         else:
@@ -155,8 +158,12 @@ def load_all_opts(scene_path, opt_file_name, convert2origin=False):
     return opt_all
 
 
-def mats2qts(mats):
+def mats2qts(mats, tolist=False):
     qts = []
     for mat in mats:
-        qts.append(pp.pose_from_tform(mat))
+        pos, orn = pp.pose_from_tform(mat)
+        if tolist:
+            qts.append((pos.tolist(), orn.tolist()))
+        else:
+            qts.append((pos, orn))
     return qts
