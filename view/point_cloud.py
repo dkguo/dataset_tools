@@ -10,6 +10,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
+from dataset_tools.utils.name import get_available_object_names
 from dataset_tools.view.open3d_window import Open3dWindow
 
 
@@ -145,10 +146,10 @@ class PointCloudWindow(Open3dWindow):
         self.scene_widget.scene.add_geometry("pcd", pcd, self.settings.pcd_material)
 
         # add objs
-        if self.obj_pose_box.checked:
-            for object_name in self.opt[self.opt['frame'] == self.frame_num]['object_name']:
-                mesh = self.load_obj_mesh(object_name)
-                self.scene_widget.scene.add_geometry(str(object_name), mesh, self.settings.obj_material)
+        # if self.obj_pose_box.checked:
+        #     for object_name in get_available_object_names(self.scene_name):
+        #         mesh = self.load_obj_mesh(object_name)
+        #         self.scene_widget.scene.add_geometry(str(object_name), mesh, self.settings.obj_material)
 
         # if self.infra_pose_box.checked:
         #     for object_name in self.ipt['object_name']:
