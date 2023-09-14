@@ -81,13 +81,16 @@ class PointCloudWindow(Open3dWindow):
         extrinsic = self.extrinsics[camera_name]
         self.scene_widget.setup_camera(intrinsic, extrinsic, 640, 480, self.bounds)
 
-    def load_pcds(self, frame_num=None, mask_dir=None):
+    def load_pcds(self, frame_num=None, mask_dir=None, selected_cameras=None):
         if frame_num is not None:
             self.frame_num = frame_num
         if mask_dir is not None:
             self.mask_dir = mask_dir
             self.mask_box.checked = True
-        if frame_num is not None or mask_dir is not None:
+        if selected_cameras is not None:
+            for i, box in self.selected_cameras:
+                box.checked = True if i in selected_cameras else False
+        if frame_num is not None or mask_dir is not None or selected_cameras is not None:
             self.update_frame()
 
         pcds = o3d.geometry.PointCloud()

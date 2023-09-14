@@ -141,7 +141,7 @@ class ObjectPoseTable(Table):
         traj = self.table[mask]['pose']
         frames = self.table[mask]['frame']
         durations = np.r_[0, np.diff(frames)] / 30.0
-        return traj, durations
+        return traj, durations.tolist()
 
 
 def load_all_opts(scene_path, opt_file_name, convert2origin=False):
