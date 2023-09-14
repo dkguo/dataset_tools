@@ -1,3 +1,3 @@
 import sys
 
-sys.path.append('./multical')
+sys.path.append('../utils/multical')
