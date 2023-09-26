@@ -7,7 +7,7 @@ import open3d as o3d
 from open3d.visualization import gui, rendering
 
 from dataset_tools.config import ycb_model_names, obj_model_names
-from dataset_tools.loaders import save_object_pose_table
+from dataset_tools.utils import save_object_pose_table
 from dataset_tools.view.open3d_window import Open3dWindow
 from dataset_tools.view.point_cloud import load_pcd_from_rgbd
 
@@ -109,7 +109,7 @@ class Annotation(Open3dWindow):
                 for obj_id in obj_ids:
                     mesh = self.load_obj_mesh(obj_id)
                     self.scene_widgets[i].scene.add_geometry(str(obj_id), mesh, self.settings.obj_material)
-                self.meshes_used.set_items([obj_model_names[i] for i in obj_ids])
+                self.meshes_used.set_items([f'{i:03d}_{obj_model_names[i]}' for i in obj_ids])
                 self.meshes_used.selected_index = 0
             else:
                 self.meshes_used.set_items([])
@@ -126,10 +126,14 @@ class Annotation(Open3dWindow):
             print(f'{obj_model_names[obj_id]} already exists')
             return
 
-        self.opt = np.append(self.opt, self.opt[-1])
+        if self.opt.size == 1 and self.opt[0]['obj_id'] == -1:
+            pass
+        else:
+            self.opt = np.append(self.opt, self.opt[-1])
         self.opt[-1]['frame'] = self.frame_num
         self.opt[-1]['obj_id'] = obj_id
 
+        print(self.opt)
         print(f'{obj_model_names[obj_id]} added')
         self.update_frame()
 
@@ -156,32 +160,7 @@ class Annotation(Open3dWindow):
         print('infrastructure pose saved')
 
     def on_keyboard_input(self, event):
-        if event.is_repeat:
-            return True
-
-        # Change frame
-        if event.key == gui.KeyName.LEFT:
-            if event.type == gui.KeyEvent.DOWN:
-                self.on_previous_frame()
-            return True
-        if event.key == gui.KeyName.RIGHT:
-            if event.type == gui.KeyEvent.DOWN:
-                self.on_next_frame()
-            return True
-
-        # Change camera view
-        if 49 <= event.key <= 56:
-            if event.type == gui.KeyEvent.DOWN:
-                view_id = event.key - 49
-                if view_id < len(self.camera_names):
-                    self.on_change_active_camera_view(view_id)
-                    return True
-
-        if event.key == gui.KeyName.LEFT_SHIFT:
-            if event.type == gui.KeyEvent.DOWN:
-                self.left_shift_modifier = True
-            elif event.type == gui.KeyEvent.UP:
-                self.left_shift_modifier = False
+        if super().on_keyboard_input(event):
             return True
 
         # if ctrl is pressed then increase translation and angle values
@@ -272,9 +251,7 @@ class Annotation(Open3dWindow):
         pose = self.opt[d]['pose']
 
         geometry = deepcopy(self.meshes[obj_id])
-        geometry.translate(pose[0:3, 3] / 1000)
-        center = pose[0:3, 3] / 1000
-        geometry.rotate(pose[0:3, 0:3], center=center)
+        geometry.transform(pose)
 
         T_ci_to_c0 = self.extrinsics[self.camera_names[self.active_camera_view]]
 
@@ -296,7 +273,6 @@ class Annotation(Open3dWindow):
         h_transform = np.linalg.inv(T_ci_to_c0) @ ci_h_transform @ T_ci_to_c0
 
         geometry.transform(h_transform)
-        h_transform[0:3, 3] *= 1000
         new_pose = h_transform @ pose
         self.opt[d]['pose'] = new_pose
 
@@ -324,11 +300,12 @@ class Annotation(Open3dWindow):
 
 
 if __name__ == "__main__":
-    scene_name = 'scene_230531164514'
-    start_image_num = 328
+    scene_name = 'scene_230704142825'
+    start_image_num = 370
     hand_mask_dir = 'hand_pose/d2/mask'
     # init_obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
     init_obj_pose_file = '../object_pose/ground_truth.csv'
+    # init_obj_pose_file = None
 
     gui.Application.instance.initialize()
     w = Annotation(scene_name, start_image_num, init_obj_pose_file=init_obj_pose_file)

@@ -1,6 +1,3 @@
-[submodule "record/multical"]
-	path = record/multical
+[submodule "utils/multical"]
+	path = utils/multical
 	url = https://github.com/dkguo/multical.git
-[submodule "render/pybind11"]
-	path = render/pybind11
-	url = https://github.com/pybind/pybind11.git

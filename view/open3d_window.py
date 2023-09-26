@@ -1,4 +1,3 @@
-import argparse
 import os
 from copy import deepcopy
 
@@ -8,9 +7,10 @@ import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 
-from dataset_tools.config import dataset_path, obj_ply_paths, obj_model_paths
-from dataset_tools.loaders import get_camera_names, load_intrinsics, load_extrinsics, get_depth_scale, \
-    load_object_pose_table, get_num_frame
+from dataset_tools.config import dataset_path
+from dataset_tools.utils.camera_parameter import load_extrinsics, get_depth_scale, load_intrinsics
+from dataset_tools.utils.name import get_camera_names, get_num_frame
+from dataset_tools.utils.pose import ObjectPoseTable
 
 
 class Settings:
@@ -40,10 +40,12 @@ class Open3dWindow:
         # load camera info
         self.intrinsics = {}
         self.extrinsics = load_extrinsics(f'{self.scene_path}/extrinsics.yml')
-        self.depth_scale = get_depth_scale(f'{self.scene_path}/{self.camera_names[0]}/camera_meta.yml', convert2unit='m')
+        self.depth_scale = get_depth_scale(f'{self.scene_path}/{self.camera_names[0]}/camera_meta.yml',
+                                           convert2unit='m')
         for camera_name in self.camera_names:
             self.intrinsics[camera_name] = load_intrinsics(f'{self.scene_path}/{camera_name}/camera_meta.yml')
             self.extrinsics[camera_name] = np.linalg.inv(self.extrinsics[camera_name])
+        # self.intrinsics = load_cameras_intrisics(scene_name)
 
         self.rgb_imgs = {}
         self.depth_imgs = {}
@@ -107,28 +109,19 @@ class Open3dWindow:
         # obj poses
         self.obj_pose_file = obj_pose_file
         self.obj_pose_box = gui.Checkbox(f'Objects')
+        self.meshes = self.load_all_obj_meshes()
+        self.view_ctrls.add_child(gui.Label(obj_pose_file))
+        self.obj_pose_box.set_on_checked(self.update_frame)
+        self.view_ctrls.add_child(self.obj_pose_box)
+        self.view_ctrls.add_child(gui.Label(""))
         if obj_pose_file is not None:
-            self.opt = load_object_pose_table(f"{self.scene_path}/{self.camera_names[0]}/{obj_pose_file}",
+            self.opt = ObjectPoseTable(f"{self.scene_path}/{self.camera_names[0]}/{obj_pose_file}",
                                               only_valid_pose=True)
-            self.meshes = self.load_all_obj_meshes()
-            self.view_ctrls.add_child(gui.Label(obj_pose_file))
-            self.obj_pose_box.set_on_checked(self.update_frame)
-            self.view_ctrls.add_child(self.obj_pose_box)
-            self.view_ctrls.add_child(gui.Label(""))
+            self.obj_pose_box.checked = True
         else:
-            print('here')
+            print('Using a temporary object pose table.')
+            self.opt = ObjectPoseTable(scene_name=self.scene_name)
             self.obj_pose_box.checked = False
-
-        # infrastructure poses
-        self.infra_pose_file = infra_pose_file
-        self.infra_pose_box = gui.Checkbox(f'Infrastructure')
-        if infra_pose_file is not None:
-            self.ipt = load_object_pose_table(f"{self.scene_path}/{infra_pose_file}",
-                                              only_valid_pose=True)
-            self.view_ctrls.add_child(gui.Label(infra_pose_file))
-            self.infra_pose_box.set_on_checked(self.update_frame)
-            self.view_ctrls.add_child(self.infra_pose_box)
-            self.view_ctrls.add_child(gui.Label(""))
 
     def load_images(self):
         for camera_name in np.array(self.camera_names):
@@ -157,12 +150,14 @@ class Open3dWindow:
 
     def load_all_obj_meshes(self):
         meshes = {}
-        for id, p in obj_ply_paths.items():
-            geometry = o3d.io.read_triangle_mesh(p)
-            if id != 101:
-                geometry = geometry.scale(0.001, geometry.get_center() / 1000)
-            # geometry.points = o3d.utility.Vector3dVector(np.array(geometry.points) / 1000)
-            meshes[id] = geometry
+        # for id, p in obj_ply_paths.items():
+        #     geometry = o3d.io.read_triangle_mesh(p)
+        #     if id == 101 or id == 70:
+        #         pass
+        #     else:
+        #         geometry.scale(0.001, geometry.get_center() / 1000)
+        #     # geometry.points = o3d.utility.Vector3dVector(np.array(geometry.points) / 1000)
+        #     meshes[id] = geometry
         return meshes
 
     def load_obj_mesh(self, obj_id):
@@ -172,9 +167,9 @@ class Open3dWindow:
 
     def load_infra_mesh(self, infra_id):
         t = self.ipt[self.ipt['obj_id'] == infra_id]
-        return self.load_mesh(t, infra_id, mm2m=False)
+        return self.load_mesh(t, infra_id)
 
-    def load_mesh(self, table_rows, obj_id, mm2m=True):
+    def load_mesh(self, table_rows, obj_id, mm2m=False):
         if len(table_rows) == 0:
             return None
         assert len(table_rows) == 1
@@ -184,13 +179,31 @@ class Open3dWindow:
         pose = deepcopy(table_row['pose'])
         if mm2m:
             pose[0:3, 3] /= 1000
-        geometry.translate(pose[0:3, 3])
-        center = pose[0:3, 3]
-        geometry.rotate(pose[0:3, 0:3], center=center)
+        geometry.transform(pose)
         return geometry
 
     def on_keyboard_input(self, event):
-        pass
+        if event.is_repeat:
+            return gui.Widget.EventCallbackResult.HANDLED
+
+        # Change frame
+        if event.key == gui.KeyName.LEFT:
+            if event.type == gui.KeyEvent.DOWN:
+                self.on_previous_frame()
+            return True
+        if event.key == gui.KeyName.RIGHT:
+            if event.type == gui.KeyEvent.DOWN:
+                self.on_next_frame()
+            return True
+
+        # Change camera view
+        if 49 <= event.key <= 56:
+            if event.type == gui.KeyEvent.DOWN:
+                view_id = event.key - 49
+                if view_id < len(self.camera_names):
+                    self.on_change_active_camera_view(view_id)
+                    return gui.Widget.EventCallbackResult.HANDLED
+        return False
 
     def on_change_active_camera_view(self, camera_id):
         if camera_id < len(self.camera_names):
@@ -203,7 +216,7 @@ class Open3dWindow:
 
 
 if __name__ == "__main__":
-    scene_name = 'scene_2210232307_01'
+    scene_name = 'scene_230905145629'
     gui.Application.instance.initialize()
     w = Open3dWindow(2048, 1536, scene_name, 'test')
     gui.Application.instance.run()

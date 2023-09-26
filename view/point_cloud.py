@@ -10,12 +10,12 @@ import pandas as pd
 from tqdm import tqdm
 
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
-from dataset_tools.loaders import get_num_frame
+from dataset_tools.utils.name import get_available_object_names
 from dataset_tools.view.open3d_window import Open3dWindow
 
 
 class PointCloudWindow(Open3dWindow):
-    def __init__(self, scene_name, init_frame_num, width=640 * 3 + 408, height=480 * 3, hand_mask_dir=None,
+    def __init__(self, scene_name, init_frame_num, width=640 * 3 + 408, height=480 * 3, mask_dir=None,
                  obj_pose_file=None, infra_pose_file=None):
         super().__init__(width, height, scene_name, 'Point Cloud', init_frame_num, obj_pose_file, infra_pose_file)
         self.bounds = None
@@ -31,21 +31,21 @@ class PointCloudWindow(Open3dWindow):
         self.window.set_on_layout(self.on_layout)
 
         # mask
-        self.hand_mask_dir = hand_mask_dir
-        self.hand_mask_box = gui.Checkbox(f'Apply Masks')
-        if hand_mask_dir is not None:
-            self.hand_masks = {}
-            self.view_ctrls.add_child(gui.Label(hand_mask_dir))
-            self.hand_mask_box.set_on_checked(self.update_frame)
-            self.view_ctrls.add_child(self.hand_mask_box)
+        self.mask_dir = mask_dir
+        self.mask_box = gui.Checkbox(f'Apply Masks')
+        self.masks = {}
+        self.mask_intsct_box = gui.Checkbox(f'Intersect Masks')
+        if mask_dir is not None:
+            self.view_ctrls.add_child(gui.Label(mask_dir))
+            self.mask_box.set_on_checked(self.update_frame)
+            self.view_ctrls.add_child(self.mask_box)
 
             # intersection
-            self.hand_mask_intsct_box = gui.Checkbox(f'Intersect Masks')
-            self.hand_mask_intsct_box.set_on_checked(self.update_frame)
-            self.view_ctrls.add_child(self.hand_mask_intsct_box)
-            self.hand_mask_intsct_convex_hull_box = gui.Checkbox(f'Show convex hull')
-            self.hand_mask_intsct_convex_hull_box.set_on_checked(self.update_frame)
-            self.view_ctrls.add_child(self.hand_mask_intsct_convex_hull_box)
+            self.mask_intsct_box.set_on_checked(self.update_frame)
+            self.view_ctrls.add_child(self.mask_intsct_box)
+            self.mask_intsct_convex_hull_box = gui.Checkbox(f'Show convex hull')
+            self.mask_intsct_convex_hull_box.set_on_checked(self.update_frame)
+            self.view_ctrls.add_child(self.mask_intsct_convex_hull_box)
             self.view_ctrls.add_child(gui.Label(""))
 
         # select camera views
@@ -81,7 +81,18 @@ class PointCloudWindow(Open3dWindow):
         extrinsic = self.extrinsics[camera_name]
         self.scene_widget.setup_camera(intrinsic, extrinsic, 640, 480, self.bounds)
 
-    def load_pcds(self):
+    def load_pcds(self, frame_num=None, mask_dir=None, selected_cameras=None):
+        if frame_num is not None:
+            self.frame_num = frame_num
+        if mask_dir is not None:
+            self.mask_dir = mask_dir
+            self.mask_box.checked = True
+        if selected_cameras is not None:
+            for i, box in self.selected_cameras:
+                box.checked = True if i in selected_cameras else False
+        if frame_num is not None or mask_dir is not None or selected_cameras is not None:
+            self.update_frame()
+
         pcds = o3d.geometry.PointCloud()
         for camera_name in self.get_selected_camera_names():
             intrinsic = self.intrinsics[camera_name]
@@ -89,21 +100,21 @@ class PointCloudWindow(Open3dWindow):
             rgb_img = self.rgb_imgs[camera_name]
             depth_img = self.depth_imgs[camera_name]
 
-            if self.hand_mask_box.checked:
-                mask = self.hand_masks[camera_name]
+            if self.mask_box.checked:
+                mask = self.masks[camera_name]
                 rgb_img = cv2.bitwise_and(rgb_img, rgb_img, mask=mask)
                 depth_img = cv2.bitwise_and(depth_img, depth_img, mask=mask)
 
             pcds += load_pcd_from_rgbd(rgb_img, depth_img, intrinsic, extrinsic)
         return pcds
 
-    def load_hand_masks(self):
+    def load_masks(self):
         for camera_name in self.camera_names:
-            mask_path = f'{self.scene_path}/{camera_name}/{self.hand_mask_dir}/{self.frame_num:06}.png'
+            mask_path = f'{self.scene_path}/{camera_name}/{self.mask_dir}/{self.frame_num:06}.png'
             if os.path.exists(mask_path):
-                self.hand_masks[camera_name] = cv2.imread(mask_path, 0)
+                self.masks[camera_name] = cv2.imread(mask_path, 0)
             else:
-                self.hand_masks[camera_name] = np.zeros((resolution_height, resolution_width)).astype('uint8')
+                self.masks[camera_name] = np.zeros((resolution_height, resolution_width)).astype('uint8')
 
     def load_convex_hulls_ls(self):
         hulls = []
@@ -111,7 +122,7 @@ class PointCloudWindow(Open3dWindow):
         for camera_name in self.get_selected_camera_names():
             intrinsic = self.intrinsics[camera_name]
             extrinsic = self.extrinsics[camera_name]
-            mask = self.hand_masks[camera_name]
+            mask = self.masks[camera_name]
             if mask.max() == 0:
                 continue
             hull, hull_ls = compute_convex_hull_line_set_from_mask(mask, intrinsic, extrinsic)
@@ -124,13 +135,13 @@ class PointCloudWindow(Open3dWindow):
         self.scene_widget.scene.clear_geometry()
         self.update_frame_label()
         self.load_images()
-        self.load_hand_masks()
+        self.load_masks()
         pcd = self.load_pcds()
 
-        if self.hand_mask_intsct_box.checked:
+        if self.mask_intsct_box.checked:
             convex_hulls, hull_lss = self.load_convex_hulls_ls()
             pcd = crop_pcd_by_convex_hulls(pcd, convex_hulls)
-            if self.hand_mask_intsct_convex_hull_box.checked:
+            if self.mask_intsct_convex_hull_box.checked:
                 for i, hull_ls in enumerate(hull_lss):
                     self.scene_widget.scene.add_geometry(f"hull_{i}", hull_ls, self.settings.line_set_material)
 
@@ -138,15 +149,15 @@ class PointCloudWindow(Open3dWindow):
         self.scene_widget.scene.add_geometry("pcd", pcd, self.settings.pcd_material)
 
         # add objs
-        if self.obj_pose_box.checked:
-            for obj_id in self.opt[self.opt['frame'] == self.frame_num]['obj_id']:
-                mesh = self.load_obj_mesh(obj_id)
-                self.scene_widget.scene.add_geometry(str(obj_id), mesh, self.settings.obj_material)
+        # if self.obj_pose_box.checked:
+        #     for object_name in get_available_object_names(self.scene_name):
+        #         mesh = self.load_obj_mesh(object_name)
+        #         self.scene_widget.scene.add_geometry(str(object_name), mesh, self.settings.obj_material)
 
-        if self.infra_pose_box.checked:
-            for obj_id in self.ipt['obj_id']:
-                mesh = self.load_infra_mesh(obj_id)
-                self.scene_widget.scene.add_geometry(str(obj_id), mesh, self.settings.obj_material)
+        # if self.infra_pose_box.checked:
+        #     for object_name in self.ipt['object_name']:
+        #         mesh = self.load_infra_mesh(object_name)
+        #         self.scene_widget.scene.add_geometry(str(object_name), mesh, self.settings.obj_material)
 
     def get_selected_camera_names(self):
         active_camera_ids = []
@@ -154,76 +165,6 @@ class PointCloudWindow(Open3dWindow):
             if box.checked:
                 active_camera_ids.append(i)
         return np.array(self.camera_names)[active_camera_ids]
-
-    def on_keyboard_input(self, event):
-        if event.is_repeat:
-            return gui.Widget.EventCallbackResult.HANDLED
-
-        # Change camera view
-        if 49 <= event.key <= 56:
-            if event.type == gui.KeyEvent.DOWN:
-                view_id = event.key - 49
-                if view_id < len(self.camera_names):
-                    self.on_change_active_camera_view(view_id)
-                    return gui.Widget.EventCallbackResult.HANDLED
-        return gui.Widget.EventCallbackResult.HANDLED
-
-    def save_distances(self, save_file_path, dist_tres=0.01, valid_infra_ids=[101]):
-        detections = np.empty(0, dtype=[('frame', 'i4'),
-                                        ('obj_id_1', 'i4'),
-                                        ('obj_id_2', 'i4'),
-                                        ('relationship', 'U20'),
-                                        ('in_contact', 'i1'),
-                                        ('distance', 'f')])
-
-        for frame in tqdm(range(get_num_frame(self.scene_path))):
-            self.frame_num = frame
-            self.load_images()
-            self.load_hand_masks()
-            pcd = self.load_pcds()
-            convex_hulls, hull_lss = self.load_convex_hulls_ls()
-            hand_pcd = crop_pcd_by_convex_hulls(pcd, convex_hulls)
-
-            for obj_id in self.opt[self.opt['frame'] == frame]['obj_id']:
-                obj_mesh = self.load_obj_mesh(obj_id)
-                obj_pcd = obj_mesh.sample_points_uniformly(1000)
-                # obj-hand
-                if len(convex_hulls) > 0:
-                    dist = compute_pcds_dist(hand_pcd, obj_pcd)
-                    detections = np.append(detections,
-                                           np.array([(frame, obj_id, 0, 'obj-hand', 0, dist)], dtype=detections.dtype))
-
-                # obj-infra
-                for infra_id in valid_infra_ids:
-                    if infra_id in self.ipt['obj_id']:
-                        infra_mesh = self.load_infra_mesh(infra_id)
-                        infra_pcd = infra_mesh.sample_points_uniformly(1000)
-                        dist = compute_pcds_dist(infra_pcd, obj_pcd)
-                        detections = np.append(detections,
-                                               np.array([(frame, obj_id, infra_id, 'obj-infra', 0, dist)],
-                                                        dtype=detections.dtype))
-
-            # obj-infra
-            for infra_id in valid_infra_ids:
-                if infra_id in self.ipt['obj_id'] and len(convex_hulls) > 0:
-                    infra_mesh = self.load_infra_mesh(infra_id)
-                    infra_pcd = infra_mesh.sample_points_uniformly(1000)
-                    dist = compute_pcds_dist(infra_pcd, hand_pcd)
-                    detections = np.append(detections,
-                                           np.array([(frame, infra_id, 0, 'infra-hand', 0, dist)],
-                                                    dtype=detections.dtype))
-
-        detections['in_contact'][detections['distance'] < dist_tres] = 1
-
-        os.makedirs(os.path.dirname(save_file_path), exist_ok=True)
-        df = pd.DataFrame.from_records(detections)
-        df = df.sort_values(by=['obj_id_1', 'obj_id_2', 'frame'])
-        df.to_csv(save_file_path, index=False)
-        print(f'distances saved to {save_file_path}')
-
-
-def compute_pcds_dist(pcd1, pcd2):
-    return min(pcd1.compute_point_cloud_distance(pcd2))
 
 
 def crop_pcd_by_convex_hulls(pcd, convex_hulls):
@@ -276,17 +217,23 @@ def load_pcd_from_rgbd(rgb_img, depth_img, intrisic, extrinsic):
 
 
 def main():
-    scene_name = 'scene_230313171600'
-    start_image_num = 220
-    hand_mask_dir = 'hand_pose/d2/mask'
+    scene_name = 'scene_230905145629'
+    start_image_num = 0
+    # mask_dir = 'hand_pose/d2/mask'
+    # mask_dir = 'masks/bowl'
+    mask_dir = None
     # obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
-    obj_pose_file = '../object_pose/ground_truth.csv'
+    # obj_pose_file = '../object_pose/point_cloud.csv'
+    # obj_pose_file = '../object_pose/ground_truth.csv'
+    obj_pose_file = None
     # infra_pose_file = 'infra_poses.csv'
     infra_pose_file = None
 
     gui.Application.instance.initialize()
     w = PointCloudWindow(scene_name, start_image_num,
-                         hand_mask_dir=hand_mask_dir, obj_pose_file=obj_pose_file, infra_pose_file=infra_pose_file)
+                         mask_dir=mask_dir,
+                         obj_pose_file=obj_pose_file,
+                         infra_pose_file=infra_pose_file)
     # w.save_distances(f'{dataset_path}/{scene_name}/segmentation_points/point_cloud/obj_states.csv')
 
     gui.Application.instance.run()
