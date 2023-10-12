@@ -149,10 +149,12 @@ class PointCloudWindow(Open3dWindow):
         self.scene_widget.scene.add_geometry("pcd", pcd, self.settings.pcd_material)
 
         # add objs
-        # if self.obj_pose_box.checked:
-        #     for object_name in get_available_object_names(self.scene_name):
-        #         mesh = self.load_obj_mesh(object_name)
-        #         self.scene_widget.scene.add_geometry(str(object_name), mesh, self.settings.obj_material)
+        if self.obj_pose_box.checked:
+            for object_name in get_available_object_names(self.scene_name):
+                mesh = self.load_obj_mesh(object_name)
+                if mesh is None:
+                    continue
+                self.scene_widget.scene.add_geometry(str(object_name), mesh, self.settings.obj_material)
 
         # if self.infra_pose_box.checked:
         #     for object_name in self.ipt['object_name']:
@@ -217,15 +219,16 @@ def load_pcd_from_rgbd(rgb_img, depth_img, intrisic, extrinsic):
 
 
 def main():
-    scene_name = 'scene_230905145629'
-    start_image_num = 0
+    scene_name = 'scene_230911173348_blue_bowl'
+    start_image_num = 148
     # mask_dir = 'hand_pose/d2/mask'
     # mask_dir = 'masks/bowl'
     mask_dir = None
     # obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
     # obj_pose_file = '../object_pose/point_cloud.csv'
     # obj_pose_file = '../object_pose/ground_truth.csv'
-    obj_pose_file = None
+    obj_pose_file = '../object_pose_table.csv'
+    # obj_pose_file = None
     # infra_pose_file = 'infra_poses.csv'
     infra_pose_file = None
 

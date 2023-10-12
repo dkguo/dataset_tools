@@ -1,3 +1,4 @@
+import logging
 import os
 from copy import deepcopy
 
@@ -9,7 +10,7 @@ import open3d.visualization.rendering as rendering
 
 from dataset_tools.config import dataset_path
 from dataset_tools.utils.camera_parameter import load_extrinsics, get_depth_scale, load_intrinsics
-from dataset_tools.utils.name import get_camera_names, get_num_frame
+from dataset_tools.utils.name import get_camera_names, get_num_frame, get_available_object_names
 from dataset_tools.utils.pose import ObjectPoseTable
 
 
@@ -150,35 +151,23 @@ class Open3dWindow:
 
     def load_all_obj_meshes(self):
         meshes = {}
-        # for id, p in obj_ply_paths.items():
-        #     geometry = o3d.io.read_triangle_mesh(p)
-        #     if id == 101 or id == 70:
-        #         pass
-        #     else:
-        #         geometry.scale(0.001, geometry.get_center() / 1000)
-        #     # geometry.points = o3d.utility.Vector3dVector(np.array(geometry.points) / 1000)
-        #     meshes[id] = geometry
+        for object_name in get_available_object_names(self.scene_name):
+            pcd_path = os.path.join(self.scene_path, 'models', object_name, 'object.pcd')
+            if not os.path.exists(pcd_path):
+                continue
+            pcd = o3d.io.read_point_cloud(pcd_path)
+            meshes[object_name] = pcd
         return meshes
 
-    def load_obj_mesh(self, obj_id):
-        d = np.logical_and(self.opt['frame'] == self.frame_num, self.opt['obj_id'] == obj_id)
-        t = self.opt[d]
-        return self.load_mesh(t, obj_id)
-
-    def load_infra_mesh(self, infra_id):
-        t = self.ipt[self.ipt['obj_id'] == infra_id]
-        return self.load_mesh(t, infra_id)
-
-    def load_mesh(self, table_rows, obj_id, mm2m=False):
-        if len(table_rows) == 0:
+    def load_obj_mesh(self, object_name):
+        if object_name not in self.meshes:
+            logging.debug(f'no mesh for {object_name}')
             return None
-        assert len(table_rows) == 1
-        table_row = table_rows[0]
-
-        geometry = deepcopy(self.meshes[obj_id])
-        pose = deepcopy(table_row['pose'])
-        if mm2m:
-            pose[0:3, 3] /= 1000
+        pose = self.opt.lookup(object_name, frame=self.frame_num)
+        if len(pose) == 0:
+            return None
+        pose = pose[0]
+        geometry = deepcopy(self.meshes[object_name])
         geometry.transform(pose)
         return geometry
 

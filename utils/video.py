@@ -130,26 +130,29 @@ def save_mp4(imgs, video_save_path, frame_rate=15):
 
 
 if __name__ == '__main__':
-    add_frame_num_to_video('/home/gdk/Data/kitchen_countertops/scene_2210232307_01/video.mp4')
+    # add_frame_num_to_video('/home/gdk/Data/kitchen_countertops/scene_2210232307_01/video.mp4')
+    #
+    # scene_name = 'scene_230310200800'
+    #
+    # scene_names = ['scene_230313172946',
+    #                'scene_230313173036',
+    #                'scene_230313173113']
+    #
+    # for scene_name in scene_names:
+    #     scene_path = f'{dataset_path}/{scene_name}'
+    #
+    #     camera_paths = []
+    #     for camera_name in get_camera_names(scene_path):
+    #         camera_paths.append(f'{scene_path}/{camera_name}/rgb')
+    #
+    #     with Pool() as pool:
+    #         pool.map(png2video, camera_paths)
+    #
+    #     video_paths = sorted(glob.glob(f'{scene_path}/camera_*/rgb/video.mp4'))
+    #     save_path = f'{scene_path}/video.mp4'
+    #     combine_videos(video_paths, save_path)
+    #
+    #     add_frame_num_to_video(save_path)
 
-    scene_name = 'scene_230310200800'
-
-    scene_names = ['scene_230313172946',
-                   'scene_230313173036',
-                   'scene_230313173113']
-
-    for scene_name in scene_names:
-        scene_path = f'{dataset_path}/{scene_name}'
-
-        camera_paths = []
-        for camera_name in get_camera_names(scene_path):
-            camera_paths.append(f'{scene_path}/{camera_name}/rgb')
-
-        with Pool() as pool:
-            pool.map(png2video, camera_paths)
-
-        video_paths = sorted(glob.glob(f'{scene_path}/camera_*/rgb/video.mp4'))
-        save_path = f'{scene_path}/video.mp4'
-        combine_videos(video_paths, save_path)
-
-        add_frame_num_to_video(save_path)
+    img_dir = '/home/gdk/Data/kitchen_lab/scene_230313173113/camera_01_827312071794/rgb'
+    png2video(img_dir)

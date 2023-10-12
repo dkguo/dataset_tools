@@ -105,7 +105,7 @@ class ObjectPoseTable(Table):
         super().save(table_path, tolist_cols)
 
     def update(self, object_name, pose: np.ndarray,
-               scene_name='undefinded', camera_name='undefinded', frame=-1, predictor='undefinded'):
+               scene_name='undefined', camera_name='undefined', frame=-1, predictor='undefined'):
         mask = self._create_mask(object_name, scene_name, camera_name, frame, predictor)
         if len(self.table[mask]) == 0:
             self.table = np.append(self.table,

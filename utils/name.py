@@ -62,7 +62,7 @@ def get_scene_name_from_path(path):
 
 
 def get_available_object_names(scene_name):
-    file_names = os.listdir(f'{dataset_path}/{scene_name}/{get_camera_names(scene_name)[0]}/masks')
+    file_names = os.listdir(f'{dataset_path}/{scene_name}/models')
     object_names = []
     for file_name in file_names:
         if file_name != 'plot' and file_name != 'kitchen' and 'csv' not in file_name:
