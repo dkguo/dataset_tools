@@ -10,7 +10,6 @@ import pandas as pd
 from tqdm import tqdm
 
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
-from dataset_tools.utils.name import get_available_object_names
 from dataset_tools.view.open3d_window import Open3dWindow
 
 
@@ -131,7 +130,8 @@ class PointCloudWindow(Open3dWindow):
                 hull_lss.append(hull_ls)
         return hulls, hull_lss
 
-    def update_frame(self, arg=None):
+    def update_frame(self, frame=None):
+        super().update_frame(frame)
         self.scene_widget.scene.clear_geometry()
         self.update_frame_label()
         self.load_images()
@@ -150,16 +150,11 @@ class PointCloudWindow(Open3dWindow):
 
         # add objs
         if self.obj_pose_box.checked:
-            for object_name in get_available_object_names(self.scene_name):
+            for object_name in np.unique(self.opt.table['object_name']):
                 mesh = self.load_obj_mesh(object_name)
                 if mesh is None:
                     continue
                 self.scene_widget.scene.add_geometry(str(object_name), mesh, self.settings.obj_material)
-
-        # if self.infra_pose_box.checked:
-        #     for object_name in self.ipt['object_name']:
-        #         mesh = self.load_infra_mesh(object_name)
-        #         self.scene_widget.scene.add_geometry(str(object_name), mesh, self.settings.obj_material)
 
     def get_selected_camera_names(self):
         active_camera_ids = []
@@ -219,8 +214,8 @@ def load_pcd_from_rgbd(rgb_img, depth_img, intrisic, extrinsic):
 
 
 def main():
-    scene_name = 'scene_230911173348_blue_bowl'
-    start_image_num = 148
+    scene_name = 'scene_231010164827_exe'
+    start_image_num = 164829
     # mask_dir = 'hand_pose/d2/mask'
     # mask_dir = 'masks/bowl'
     mask_dir = None

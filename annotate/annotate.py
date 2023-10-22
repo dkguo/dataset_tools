@@ -6,8 +6,7 @@ import numpy as np
 import open3d as o3d
 from open3d.visualization import gui, rendering
 
-from dataset_tools.config import ycb_model_names, obj_model_names
-from dataset_tools.utils import save_object_pose_table
+from dataset_tools.utils.name import get_available_object_names
 from dataset_tools.view.open3d_window import Open3dWindow
 from dataset_tools.view.point_cloud import load_pcd_from_rgbd
 
@@ -28,7 +27,7 @@ class Annotation(Open3dWindow):
         self.objects = gui.CollapsableVert("Objects", 0.33 * em, gui.Margins(em, 0, 0, 0))
         self.meshes_available = gui.ListView()
         self.meshes_available.set_max_visible_items(10)
-        self.meshes_available.set_items(ycb_model_names)
+        self.meshes_available.set_items(get_available_object_names(self.scene_name) + ['sink_origin', 'robot_tag'])
         self.meshes_used = gui.ListView()
         self.meshes_used.set_max_visible_items(5)
         self.add_mesh_button = gui.Button("Add Mesh")
@@ -37,14 +36,11 @@ class Annotation(Open3dWindow):
         self.remove_mesh_button.set_on_clicked(self.on_remove_mesh)
         self.save_obj_pose_button = gui.Button("Save Object Pose")
         self.save_obj_pose_button.set_on_clicked(self.on_save_obj_pose)
-        self.save_infra_pose_button = gui.Button("Save Infrastructure Pose")
-        self.save_infra_pose_button.set_on_clicked(self.on_save_infra_pose)
         self.objects.add_child(self.meshes_available)
         self.objects.add_child(self.add_mesh_button)
         self.objects.add_child(self.meshes_used)
         self.objects.add_child(self.remove_mesh_button)
         self.objects.add_child(self.save_obj_pose_button)
-        self.objects.add_child(self.save_infra_pose_button)
         self.settings_panel.add_child(self.objects)
 
         self.scene_widgets = []
@@ -89,7 +85,8 @@ class Annotation(Open3dWindow):
             pcds.append(load_pcd_from_rgbd(rgb_img, depth_img, intrinsic, extrinsic))
         return pcds
 
-    def update_frame(self, args=None):
+    def update_frame(self, frame=None):
+        super().update_frame(frame)
         self.update_frame_label()
         self.load_images()
 
@@ -105,11 +102,12 @@ class Annotation(Open3dWindow):
 
             if self.obj_pose_box.checked:
                 self.objects.set_is_open(True)
-                obj_ids = self.opt[self.opt['frame'] == self.frame_num]['obj_id']
-                for obj_id in obj_ids:
-                    mesh = self.load_obj_mesh(obj_id)
-                    self.scene_widgets[i].scene.add_geometry(str(obj_id), mesh, self.settings.obj_material)
-                self.meshes_used.set_items([f'{i:03d}_{obj_model_names[i]}' for i in obj_ids])
+                obj_names = self.opt.table[self.opt.table['frame'] == self.frame_num]['object_name']
+                for name in obj_names:
+                    mesh = self.load_obj_mesh(name)
+                    if mesh is not None:
+                        self.scene_widgets[i].scene.add_geometry(name, mesh, self.settings.obj_material)
+                self.meshes_used.set_items(obj_names)
                 self.meshes_used.selected_index = 0
             else:
                 self.meshes_used.set_items([])
@@ -120,44 +118,30 @@ class Annotation(Open3dWindow):
             print('no obj selected')
             return
 
-        obj_id = int(self.meshes_available.selected_value[:3])
+        obj_name = self.meshes_available.selected_value
 
-        if obj_id in self.opt[self.opt['frame'] == self.frame_num]['obj_id']:
-            print(f'{obj_model_names[obj_id]} already exists')
+        if obj_name in self.opt.table[self.opt.table['frame'] == self.frame_num]['object_name']:
+            print(f'{obj_name} already exists in Frame {self.frame_num}')
             return
 
-        if self.opt.size == 1 and self.opt[0]['obj_id'] == -1:
-            pass
-        else:
-            self.opt = np.append(self.opt, self.opt[-1])
-        self.opt[-1]['frame'] = self.frame_num
-        self.opt[-1]['obj_id'] = obj_id
+        self.opt.update(obj_name, np.eye(4), self.scene_name, 'combined', self.frame_num, 'annotation')
 
-        print(self.opt)
-        print(f'{obj_model_names[obj_id]} added')
+        print(f'{obj_name} added')
         self.update_frame()
 
     def on_remove_mesh(self):
         if self.meshes_used.selected_index == -1:
             print('no obj selected')
             return
-        obj_id = int(self.meshes_used.selected_value[:3])
-        s = np.logical_and(self.opt['frame'] == self.frame_num, self.opt['obj_id'] == obj_id)
-        self.opt = self.opt[~s]
-        print(f'{obj_model_names[obj_id]} removed')
+        obj_name = self.meshes_available.selected_value
+        self.opt.remove(obj_name, frame=self.frame_num)
+        print(f'{obj_name} removed')
         self.update_frame()
 
     def on_save_obj_pose(self):
-        opt = self.opt[self.opt['obj_id'] < 99]
-        save_object_pose_table(opt, f'{self.scene_path}/object_pose/ground_truth_tmp.csv')
+        self.opt.save()
         self.annotation_changed = False
         print('object pose saved')
-
-    def on_save_infra_pose(self):
-        ipt = self.opt[self.opt['obj_id'] > 99]
-        save_object_pose_table(ipt, f'{self.scene_path}/infra_poses_tmp.csv')
-        self.annotation_changed = False
-        print('infrastructure pose saved')
 
     def on_keyboard_input(self, event):
         if super().on_keyboard_input(event):
@@ -180,6 +164,13 @@ class Annotation(Open3dWindow):
             elif event.type == gui.KeyEvent.UP:
                 self.dist = 0.005
                 self.deg = 1.
+            return True
+
+        if event.key == gui.KeyName.LEFT_SHIFT:
+            if event.type == gui.KeyEvent.DOWN:
+                self.left_shift_modifier = True
+            elif event.type == gui.KeyEvent.UP:
+                self.left_shift_modifier = False
             return True
 
         # if no active_mesh selected print error
@@ -243,14 +234,10 @@ class Annotation(Open3dWindow):
 
     def move_selected_obj(self, x, y, z, rx, ry, rz):
         self.annotation_changed = True
+        obj_name = self.meshes_used.selected_value
+        pose = self.opt.lookup(obj_name, frame=self.frame_num)[0]
 
-        obj_id = int(self.meshes_used.selected_value[:3])
-        d = np.logical_and(self.opt['frame'] == self.frame_num, self.opt['obj_id'] == obj_id)
-        assert len(d.nonzero()[0] == 1)
-        d = d.nonzero()[0][0]
-        pose = self.opt[d]['pose']
-
-        geometry = deepcopy(self.meshes[obj_id])
+        geometry = deepcopy(self.meshes[obj_name])
         geometry.transform(pose)
 
         T_ci_to_c0 = self.extrinsics[self.camera_names[self.active_camera_view]]
@@ -274,37 +261,31 @@ class Annotation(Open3dWindow):
 
         geometry.transform(h_transform)
         new_pose = h_transform @ pose
-        self.opt[d]['pose'] = new_pose
+        self.opt.update(obj_name, new_pose, self.scene_name, 'combined', self.frame_num, 'annotation', overwrite_all=True)
 
         # update every scene widget
         for w in self.scene_widgets:
-            w.scene.remove_geometry(str(obj_id))
-            w.scene.add_geometry(str(obj_id), geometry, self.settings.obj_material)
+            w.scene.remove_geometry(obj_name)
+            w.scene.add_geometry(obj_name, geometry, self.settings.obj_material)
 
     def copy_pose_from_frame(self, src_frame_num):
         self.annotation_changed = True
-
-        obj_id = int(self.meshes_used.selected_value[:3])
-
-        src_row = np.logical_and(self.opt['frame'] == src_frame_num, self.opt['obj_id'] == obj_id)
-        if not len(src_row.nonzero()[0] == 1):
-            print(f"Object {obj_id} not found in frame {src_frame_num}")
+        object_name = self.meshes_used.selected_value
+        src_pose = self.opt.lookup(object_name, frame=src_frame_num)
+        if len(src_pose) == 0:
+            print(f"Object {object_name} not found in frame {src_frame_num}")
             return
-        src_row = src_row.nonzero()[0][0]
-        queued_pose = self.opt[src_row]['pose']
-
-        dest_row = np.logical_and(self.opt['frame'] == self.frame_num, self.opt['obj_id'] == obj_id).nonzero()[0][0]
-        self.opt[dest_row]['pose'] = deepcopy(queued_pose)
-
+        src_pose = src_pose[0]
+        self.opt.update(object_name, src_pose, self.scene_name, 'combined', self.frame_num, 'annotation')
         self.update_frame()
 
 
 if __name__ == "__main__":
-    scene_name = 'scene_230704142825'
-    start_image_num = 370
-    hand_mask_dir = 'hand_pose/d2/mask'
+    scene_name = 'scene_230911173348_blue_bowl'
+    start_image_num = 102
+    # hand_mask_dir = 'hand_pose/d2/mask'
     # init_obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
-    init_obj_pose_file = '../object_pose/ground_truth.csv'
+    init_obj_pose_file = '../object_pose_table.csv'
     # init_obj_pose_file = None
 
     gui.Application.instance.initialize()

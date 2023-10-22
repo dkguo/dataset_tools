@@ -21,7 +21,7 @@ class Settings:
         self.pcd_material.shader = "defaultUnlit"
 
         self.obj_material = rendering.MaterialRecord()
-        self.obj_material.base_color = [0, 1, 0, 1.0]
+        # self.obj_material.base_color = [0, 1, 0, 1.0]
         self.obj_material.shader = "defaultUnlit"
 
         self.line_set_material = rendering.MaterialRecord()
@@ -146,8 +146,9 @@ class Open3dWindow:
     def on_point_size(self, size):
         pass
 
-    def update_frame(self, args=None):
-        pass
+    def update_frame(self, frame=None):
+        if frame is not None:
+            self.frame_num = frame
 
     def load_all_obj_meshes(self):
         meshes = {}
@@ -157,6 +158,9 @@ class Open3dWindow:
                 continue
             pcd = o3d.io.read_point_cloud(pcd_path)
             meshes[object_name] = pcd
+        meshes['robot_tag'] = create_coordinate_frame_mesh(0.03)
+        meshes['robot_base'] = create_coordinate_frame_mesh(0.2)
+        meshes['sink_origin'] = create_coordinate_frame_mesh(0.06)
         return meshes
 
     def load_obj_mesh(self, object_name):
@@ -202,6 +206,26 @@ class Open3dWindow:
 
     def set_active_camera_view(self):
         pass
+
+
+def create_coordinate_frame_mesh(size=1.0):
+    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0, origin=[0, 0, 0])
+
+    red_square = o3d.geometry.TriangleMesh.create_box(width=0.01, height=1.0, depth=1)
+    red_square.translate([-0.005, -1.0 / 2, -1.0 / 2])
+    red_square.paint_uniform_color([1, 0, 0])
+
+    blue_square = o3d.geometry.TriangleMesh.create_box(width=1.0, height=1.0, depth=0.01)
+    blue_square.translate([-1.0 / 2, -1.0 / 2, -0.005])
+    blue_square.paint_uniform_color([0, 0, 1])
+
+    green_square = o3d.geometry.TriangleMesh.create_box(width=1.0, height=0.01, depth=1)
+    green_square.translate([-1.0 / 2, -0.005, -1.0 / 2])
+    green_square.paint_uniform_color([0, 1, 0])
+
+    mesh = coordinate_frame + red_square + blue_square + green_square
+    mesh.scale(size, [0, 0, 0])
+    return mesh
 
 
 if __name__ == "__main__":

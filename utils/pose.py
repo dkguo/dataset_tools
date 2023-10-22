@@ -1,3 +1,4 @@
+import logging
 import os
 
 import numpy as np
@@ -102,10 +103,13 @@ class ObjectPoseTable(Table):
     def save(self, table_path=None, tolist_cols=None, sort_by=None):
         if tolist_cols is None:
             tolist_cols = ['pose']
-        super().save(table_path, tolist_cols)
+        super().save(table_path, tolist_cols, ['object_name', 'frame'])
 
     def update(self, object_name, pose: np.ndarray,
-               scene_name='undefined', camera_name='undefined', frame=-1, predictor='undefined'):
+               scene_name='undefined', camera_name='undefined', frame=-1, predictor='undefined',
+               overwrite_all=False):
+        if overwrite_all:
+            self.remove(object_name, 'any', 'any', frame, 'any')
         mask = self._create_mask(object_name, scene_name, camera_name, frame, predictor)
         if len(self.table[mask]) == 0:
             self.table = np.append(self.table,
@@ -120,6 +124,14 @@ class ObjectPoseTable(Table):
         mask = self._create_mask(object_name, scene_name, camera_name, frame, predictor)
         return self.table[mask]['pose']
 
+    def remove(self, object_name,
+               scene_name='undefined', camera_name='undefined', frame=-1, predictor='undefined'):
+        mask = self._create_mask(object_name, scene_name, camera_name, frame, predictor)
+        if len(self.table[mask]) > 0:
+            self.table = self.table[~mask]
+        else:
+            logging.warning(f'No entry found for {object_name} in {scene_name} {camera_name} {frame} {predictor}')
+
     def _create_mask(self, object_name,
                      scene_name='any', camera_name='any', frame=-1, predictor='any'):
         mask = self.table['object_name'] == object_name
@@ -133,11 +145,12 @@ class ObjectPoseTable(Table):
             mask = np.logical_and(mask, self.table['predictor'] == predictor)
         return mask
 
-    def lookup_trajectory(self, start_frame, end_frame, object_name,
+    def lookup_trajectory(self, frames, object_name,
                           scene_name='any', camera_name='any', predictor='any'):
         self.table.sort(order=['frame'])
         mask = self._create_mask(object_name, scene_name, camera_name, predictor=predictor)
-        mask = np.logical_and.reduce([mask, self.table['frame'] >= start_frame, self.table['frame'] <= end_frame])
+        frame_mask = np.logical_or.reduce([self.table['frame'] == frame for frame in frames])
+        mask = np.logical_and.reduce([mask, frame_mask])
         traj = self.table[mask]['pose']
         frames = self.table[mask]['frame']
         durations = np.r_[0, np.diff(frames)] / 30.0
@@ -161,9 +174,13 @@ def load_all_opts(scene_path, opt_file_name, convert2origin=False):
 def mats2qts(mats, tolist=False):
     qts = []
     for mat in mats:
-        pos, orn = pp.pose_from_tform(mat)
-        if tolist:
-            qts.append((pos.tolist(), orn.tolist()))
-        else:
-            qts.append((pos, orn))
+        qts.append(mat2qt(mat, tolist))
     return qts
+
+
+def mat2qt(mat, tolist=False):
+    pos, orn = pp.pose_from_tform(mat)
+    if tolist:
+        return pos.tolist(), orn.tolist()
+    else:
+        return pos, orn
