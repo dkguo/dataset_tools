@@ -10,6 +10,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
+from dataset_tools.utils.name import get_newest_scene_name
 from dataset_tools.view.open3d_window import Open3dWindow
 
 
@@ -214,16 +215,17 @@ def load_pcd_from_rgbd(rgb_img, depth_img, intrisic, extrinsic):
 
 
 def main():
-    scene_name = 'scene_231010164827_exe'
-    start_image_num = 164829
+    # scene_name = 'scene_231010164827_exe'
+    scene_name = get_newest_scene_name()
+    start_image_num = 220356
     # mask_dir = 'hand_pose/d2/mask'
     # mask_dir = 'masks/bowl'
     mask_dir = None
     # obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
     # obj_pose_file = '../object_pose/point_cloud.csv'
     # obj_pose_file = '../object_pose/ground_truth.csv'
-    obj_pose_file = '../object_pose_table.csv'
-    # obj_pose_file = None
+    # obj_pose_file = '../object_pose_table.csv'
+    obj_pose_file = None
     # infra_pose_file = 'infra_poses.csv'
     infra_pose_file = None
 
