@@ -28,7 +28,7 @@ def create_folders(scene_path):
     """Create scene and camera folders"""
     if os.path.exists(scene_path):
         shutil.rmtree(scene_path)
-    os.mkdir(scene_path)
+    os.makedirs(scene_path)
     print('Saving data to', scene_path)
 
 

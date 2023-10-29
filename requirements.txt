@@ -3,7 +3,13 @@ pyrender
 PyOpenGL-accelerate
 numpy
 pyrealsense2
-opencv-python==4.5.5.64
+opencv-contrib-python==4.5.5.64
 pypng
 pytz
 scipy
+multical
+cmake
+apriltag
+transforms3d
+pybullet_planning
+
