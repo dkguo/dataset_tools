@@ -1,5 +1,6 @@
 # from dataset_tools.view.renderer import create_renderer
 # create_renderer()
+import sys
 from copy import deepcopy
 
 import numpy as np
@@ -13,7 +14,7 @@ from dataset_tools.view.point_cloud import load_pcd_from_rgbd
 
 class Annotation(Open3dWindow):
     def __init__(self, scene_name, init_frame_num, width=640 * 3 + 408, height=480 * 3, init_obj_pose_file=None):
-        super().__init__(width, height, scene_name, 'Point Cloud', init_frame_num, obj_pose_file=init_obj_pose_file)
+        super().__init__(width, height, scene_name, 'Annotation', init_frame_num, obj_pose_file=init_obj_pose_file)
         em = self.window.theme.font_size
 
         self.window.set_on_key(self.on_keyboard_input)
@@ -85,7 +86,7 @@ class Annotation(Open3dWindow):
             pcds.append(load_pcd_from_rgbd(rgb_img, depth_img, intrinsic, extrinsic))
         return pcds
 
-    def update_frame(self, frame=None):
+    def update_frame(self, *args, frame=None):
         super().update_frame(frame)
         self.update_frame_label()
         self.load_images()
@@ -281,12 +282,18 @@ class Annotation(Open3dWindow):
 
 
 if __name__ == "__main__":
-    scene_name = 'scene_230911173348_blue_bowl'
-    start_image_num = 102
-    # hand_mask_dir = 'hand_pose/d2/mask'
-    # init_obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
-    init_obj_pose_file = '../object_pose_table.csv'
-    # init_obj_pose_file = None
+    if len(sys.argv) > 1:
+        print(sys.argv)
+        scene_name = sys.argv[1]
+        start_image_num = int(sys.argv[2])
+        init_obj_pose_file = sys.argv[3] if len(sys.argv) > 3 else None
+    else:
+        scene_name = 'scene_231116075559_blue_cup'
+        start_image_num = 30
+        # hand_mask_dir = 'hand_pose/d2/mask'
+        # init_obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
+        # init_obj_pose_file = '../object_pose_table_figure.csv'
+        init_obj_pose_file = None
 
     gui.Application.instance.initialize()
     w = Annotation(scene_name, start_image_num, init_obj_pose_file=init_obj_pose_file)

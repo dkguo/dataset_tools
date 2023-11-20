@@ -24,6 +24,9 @@ class Table:
         else:
             self.table = self.create_empty_table()
 
+    def reload(self, **kwargs):
+        self.table = self.load(self.table_path, **kwargs)
+
     def create_empty_table(self):
         pass
 

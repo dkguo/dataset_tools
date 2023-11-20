@@ -131,7 +131,7 @@ class PointCloudWindow(Open3dWindow):
                 hull_lss.append(hull_ls)
         return hulls, hull_lss
 
-    def update_frame(self, frame=None):
+    def update_frame(self, *args, frame=None):
         super().update_frame(frame)
         self.scene_widget.scene.clear_geometry()
         self.update_frame_label()
@@ -215,17 +215,17 @@ def load_pcd_from_rgbd(rgb_img, depth_img, intrisic, extrinsic):
 
 
 def main():
-    # scene_name = 'scene_231010164827_exe'
-    scene_name = get_newest_scene_name()
-    start_image_num = 220356
+    scene_name = 'scene_230911173348_blue_bowl'
+    # scene_name = get_newest_scene_name()
+    start_image_num = 000000
     # mask_dir = 'hand_pose/d2/mask'
-    # mask_dir = 'masks/bowl'
-    mask_dir = None
+    mask_dir = 'masks/hand'
+    # mask_dir = None
     # obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
     # obj_pose_file = '../object_pose/point_cloud.csv'
     # obj_pose_file = '../object_pose/ground_truth.csv'
-    # obj_pose_file = '../object_pose_table.csv'
-    obj_pose_file = None
+    obj_pose_file = '../object_pose_table_figure.csv'
+    # obj_pose_file = None
     # infra_pose_file = 'infra_poses.csv'
     infra_pose_file = None
 
