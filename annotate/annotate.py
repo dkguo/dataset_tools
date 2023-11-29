@@ -7,7 +7,7 @@ import numpy as np
 import open3d as o3d
 from open3d.visualization import gui, rendering
 
-from dataset_tools.utils.name import get_available_object_names
+from dataset_tools.utils.name import get_available_object_names, get_newest_scene_name, get_available_frames
 from dataset_tools.view.open3d_window import Open3dWindow
 from dataset_tools.view.point_cloud import load_pcd_from_rgbd
 
@@ -288,8 +288,8 @@ if __name__ == "__main__":
         start_image_num = int(sys.argv[2])
         init_obj_pose_file = sys.argv[3] if len(sys.argv) > 3 else None
     else:
-        scene_name = 'scene_231116075559_blue_cup'
-        start_image_num = 30
+        scene_name = get_newest_scene_name()
+        start_image_num = 163212
         # hand_mask_dir = 'hand_pose/d2/mask'
         # init_obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
         # init_obj_pose_file = '../object_pose_table_figure.csv'
