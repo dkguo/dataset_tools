@@ -289,7 +289,7 @@ if __name__ == "__main__":
         init_obj_pose_file = sys.argv[3] if len(sys.argv) > 3 else None
     else:
         scene_name = get_newest_scene_name()
-        start_image_num = 163212
+        start_image_num = 173107
         # hand_mask_dir = 'hand_pose/d2/mask'
         # init_obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
         # init_obj_pose_file = '../object_pose_table_figure.csv'
