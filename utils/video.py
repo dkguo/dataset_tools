@@ -154,5 +154,5 @@ if __name__ == '__main__':
     #
     #     add_frame_num_to_video(save_path)
 
-    img_dir = '/home/gdk/Data/kitchen_lab/scene_230911173348_blue_bowl/camera_01_827312072396/rgb'
+    img_dir = '/home/gdk/Data/kitchen_lab/scene_231116083342_fork/camera_01_827312072396/rgb'
     png2video(img_dir)

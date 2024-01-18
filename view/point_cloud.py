@@ -12,6 +12,7 @@ from tqdm import tqdm
 from dataset_tools.config import dataset_path, resolution_width, resolution_height
 from dataset_tools.utils.name import get_newest_scene_name
 from dataset_tools.view.open3d_window import Open3dWindow
+from modules.object_pose_detection.point_cloud.utils import display_inlier_outlier
 
 
 class PointCloudWindow(Open3dWindow):
@@ -215,17 +216,17 @@ def load_pcd_from_rgbd(rgb_img, depth_img, intrisic, extrinsic):
 
 
 def main():
-    scene_name = 'scene_230911173348_blue_bowl'
-    # scene_name = get_newest_scene_name()
-    start_image_num = 000000
+    # scene_name = 'scene_230911173348_blue_bowl'
+    scene_name = get_newest_scene_name()
+    start_image_num = 152756
     # mask_dir = 'hand_pose/d2/mask'
-    mask_dir = 'masks/hand'
+    mask_dir = 'masks/cup_water_bottle'
     # mask_dir = None
     # obj_pose_file = 'object_pose/multiview_medium/object_poses.csv'
     # obj_pose_file = '../object_pose/point_cloud.csv'
     # obj_pose_file = '../object_pose/ground_truth.csv'
-    obj_pose_file = '../object_pose_table_figure.csv'
-    # obj_pose_file = None
+    # obj_pose_file = '../object_pose_table_figure.csv'
+    obj_pose_file = None
     # infra_pose_file = 'infra_poses.csv'
     infra_pose_file = None
 
@@ -235,6 +236,18 @@ def main():
                          obj_pose_file=obj_pose_file,
                          infra_pose_file=infra_pose_file)
     # w.save_distances(f'{dataset_path}/{scene_name}/segmentation_points/point_cloud/obj_states.csv')
+
+    pcd = w.load_pcds(mask_dir=mask_dir, selected_cameras=[0, 1, 3, 4, 5, 6])
+    clean_pcd_1, ind_1 = pcd.remove_statistical_outlier(nb_neighbors=1000, std_ratio=2)
+    clean_pcd_2, ind_2 = clean_pcd_1.remove_statistical_outlier(nb_neighbors=2000, std_ratio=1)
+    display_inlier_outlier(clean_pcd_1, ind_2)
+    # clean_pcd_2.orient_normals_consistent_tangent_plane(100)
+    clean_pcd_2.normals = o3d.utility.Vector3dVector(np.asarray(clean_pcd_2.normals))  # TODO: flip normals
+    o3d.visualization.draw_geometries([clean_pcd_2])
+
+    o3d.io.write_point_cloud('cups.pcd', clean_pcd_2)
+
+    # o3d.visualization.draw_geometries([pcd])
 
     gui.Application.instance.run()
 
